@@ -1,0 +1,33 @@
+{
+  "name": "discord-whiterabbit",
+  "version": "1.0.0",
+  "description": "Bot for Discord to coordinate people in different timezones",
+  "main": "main.js",
+  "engines": {
+    "node": "^6.11.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/t3rminus/discord-whiterabbit.git"
+  },
+  "author": "Kevin S",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/t3rminus/discord-whiterabbit/issues"
+  },
+  "homepage": "https://github.com/t3rminus/discord-whiterabbit#readme",
+  "dependencies": {
+    "bluebird": "^3.5.1",
+    "discord.js": "^11.2.1",
+    "fuzzy-matching": "^0.4.3",
+    "ioredis": "^3.2.1",
+    "moment-timezone": "^0.5.13",
+    "request": "^2.83.0",
+    "request-promise": "^4.2.2"
+  },
+  "devDependencies": {}
+}
