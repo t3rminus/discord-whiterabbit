@@ -2,9 +2,9 @@
 const Bluebird = require('bluebird'),
 	Discord = require('discord.js'),
 	Redis = require('ioredis'),
-	pr = require('request-promise'),
 	moment = require('moment-timezone'),
-	FuzzyMatching = require('fuzzy-matching');
+	FuzzyMatching = require('fuzzy-matching'),
+	lib = require('./wrlib');
 
 const bot = new Discord.Client();
 const db = new Redis(process.env.REDIS_URL);
@@ -32,7 +32,7 @@ bot.on('ready', function() {
 bot.on('message', function(message) {
 	if(message.content.indexOf('?tz ') === 0) {
 		const params = message.content.slice(3);
-		lookupCity(params)
+		lib.lookupCity(params)
 			.then((result) => {
 				result.user = message.author.username + '#' + message.author.discriminator;
 				return db.set(result.user, JSON.stringify(result))
@@ -110,7 +110,7 @@ bot.on('message', function(message) {
 							.then(JSON.parse)
 							.then((userData) => {
 								if(userData) {
-									return generateMessage(nick, userData, myData);
+									return lib.generateMessage(nick, userData, myData);
 								} else {
 									return nick + ': I couldn’t find that user’s data.';
 								}
@@ -134,6 +134,22 @@ bot.on('message', function(message) {
 			console.log('Couldn\'t get server users');
 		}
 	}
+	
+	if(message.content === 'Callooh! Callay!') {
+		db.get('jabberwocky-verse')
+			.then((result) => {
+				result = +result;
+				if(!Number.isInteger(result)) {
+					result = 0;
+				}
+				const verse = lib.VERSE[result];
+				result = (result + 1) % lib.VERSE.length;
+				db.set('jabberwocky-verse', result)
+					.then(() => {
+						message.channel.send(verse);
+					});
+			});
+	}
 });
 
 bot.on('error', function(err) {
@@ -142,53 +158,3 @@ bot.on('error', function(err) {
 
 // Start the bot!
 bot.login(process.env.DISCORD_TOKEN);
-
-function generateMessage(nick, theirData, myData) {
-	if(myData && myData.user !== theirData.user) {
-		let result = nick + ': Their local time is ' + moment().tz(theirData.timezone).format('h:mm a z');
-		const hrDiff = ((theirData.offset - myData.offset) / 3600),
-			fmtDiff = Math.abs(hrDiff).toFixed(2).replace(/[0.]+$/, '');
-		if (hrDiff === 0) {
-			result += '\nThey are in the same time zone as you!';
-		} else {
-			result += '\nThey are ' + fmtDiff + ' hours ' + ((hrDiff > 0) ? 'ahead of' : 'behind') + ' you';
-		}
-		return result;
-	} else if(myData && myData.user === theirData.user) {
-		return nick + ': Your local time is ' + moment().tz(theirData.timezone).format('h:mm a z')
-	} else {
-		return nick + ': Their local time is ' + moment().tz(theirData.timezone).format('h:mm a z');
-	}
-};
-
-function lookupCity(city) {
-	let address, location;
-	return pr('https://maps.googleapis.com/maps/api/geocode/json?address=' + encodeURIComponent(city))
-		.then(JSON.parse)
-		.then((result) => {
-			if(result.status !== 'OK' || !result.results || !result.results[0]) {
-				throw new Error('An error occurred looking up that city.');
-			}
-			
-			result = result.results[0];
-			address = result.formatted_address;
-			location = result.geometry.location;
-			
-			const curTime = moment().unix();
-			return pr('https://maps.googleapis.com/maps/api/timezone/json?timestamp=' +
-				encodeURIComponent(curTime) + '&location=' +
-				encodeURIComponent(location.lat) + ',' + encodeURIComponent(location.lng))
-				.then(JSON.parse)
-				.then((tzResult) => {
-					if(!tzResult || tzResult.status !== 'OK' || !tzResult.timeZoneId) {
-						throw new Error('An error occurred looking up that time zone.');
-					}
-					
-					return {
-						address: address,
-						timezone: tzResult.timeZoneId,
-						offset: tzResult.rawOffset
-					};
-				});
-		});
-};
