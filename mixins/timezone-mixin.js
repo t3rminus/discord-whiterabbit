@@ -46,7 +46,7 @@ class TimezoneMixin extends BotBase {
 	
 	command__tz(params, message) {
 		if(/^\s*$/.test(params)) {
-			return BotBase.fail(message);
+			return this.fail(message);
 		}
 		
 		// Look up their timezone
@@ -106,7 +106,7 @@ class TimezoneMixin extends BotBase {
 			return this.findUsers(params, message)
 			.then((members) => {
 				if(!members) {
-					return BotBase.fail(message);
+					return this.fail(message);
 				}
 				
 				// For each member, figure out who they are and look up their info

@@ -20,7 +20,7 @@ class DiceMixin extends BotBase {
 			const diceResult = DiceMixin.diceRoll(params);
 			
 			if(!diceResult || !diceResult.dice || !diceResult.dice.length) {
-				return BotBase.fail(message);
+				return this.fail(message);
 			}
 			
 			let resultMessage = '';
