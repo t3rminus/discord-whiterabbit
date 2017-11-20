@@ -53,7 +53,8 @@ class DnDSpellMixin extends BotBase {
 			helpText: 'Look up a Dungeons & Dragons 5th Edition Spell',
 			args: ['spellname'],
 			method: 'command__spell5e',
-			parseParams: false
+			parseParams: false,
+			sort: 100
 		};
 	}
 	

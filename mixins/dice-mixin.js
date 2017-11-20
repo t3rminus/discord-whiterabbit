@@ -16,9 +16,8 @@ class DiceMixin extends BotBase {
 	}
 
 	command__roll(params, message) {
-		return Bluebird.try(() => {
-			const diceResult = DiceMixin.diceRoll(params);
-			
+		params = params.trim();
+		return this.diceRoll(params, message).then((diceResult) => {
 			if(!diceResult || !diceResult.dice || !diceResult.dice.length) {
 				return this.fail(message);
 			}
@@ -75,26 +74,24 @@ class DiceMixin extends BotBase {
 		});
 	}
 
-	static diceRoll(diceCommand) {
-		const results = {
-			dice: []
-		};
-		
+	diceRoll(diceCommand, message) {
 		let error = false;
 		
 		let tmpDice, tmpAdd;
 		const dicePattern = /([0-9]+)d([0-9]+)/g;
-		const addPattern = /\s?([+-])\s?([0-9]+)/g;
+		const addPattern = /\s?([+-])\s?(\S+)/g;
+		
+		const dice = [];
 		
 		while (tmpDice = dicePattern.exec(diceCommand)) {
 			if(tmpDice[1] && tmpDice[2] && parseInt(tmpDice[1]) && parseInt(tmpDice[2])) {
 				const die = {
 					count: parseInt(tmpDice[1]),
 					max: parseInt(tmpDice[2]),
-					modifier: null
+					modifiers: []
 				};
 				
-				if(die.count > 1000 || die.max < 0 || die.max > 10000) {
+				if(die.count > 200 || die.max < 0 || die.max > 10000) {
 					error = true;
 					break;
 				}
@@ -103,53 +100,82 @@ class DiceMixin extends BotBase {
 				if(modifiers[0] && modifiers[0].length) {
 					let theAddition = modifiers[0];
 					while (tmpAdd = addPattern.exec(theAddition)) {
-						if(parseInt(tmpAdd[1] + tmpAdd[2])) {
-							if(die.modifier === null) {
-								die.modifier = 0;
-							}
-							die.modifier += parseInt(tmpAdd[1] + tmpAdd[2]);
-						}
+						die.modifiers.push({sign: tmpAdd[1], value: tmpAdd[2]});
 					}
 				}
-				results.dice.push(die);
+				dice.push(die);
 			} else {
 				error = true;
 				break;
 			}
 		}
 		
-		let roll;
 		if(!error) {
-			results.total = 0;
-			results.modifierTotal = null;
-			
-			results.dice.forEach(function(die) {
+			return Bluebird.map(dice, (die) => {
 				die.results = [];
 				die.total = 0;
+				
 				for(let i = 0; i < die.count; i++) {
-					roll = Math.floor((Math.random() * die.max) + 1);
+					const roll = Math.floor((Math.random() * die.max) + 1);
 					die.results.push(roll);
 					die.total += roll;
-					results.total += roll;
 				}
 				
-				if(die.modifier !== null) {
-					if(!results.modifierTotal) {
-						results.modifierTotal = 0;
+				let result = Bluebird.resolve(die);
+				if(die.modifiers.length) {
+					result = result.then((die) => {
+						return Bluebird.map(die.modifiers, modifier => {
+							const intMod = parseInt('' + modifier.sign + modifier.value);
+							if(Number.isNaN(intMod) && this.roll__getStat) {
+								return this.roll__getStat(modifier.value, message)
+								.then(val => {
+									if (!val) {
+										return 0;
+									}
+									
+									return modifier.sign === '-' ? val * -1 : val;
+								});
+							} else if(Number.isNaN(intMod)) {
+								return 0;
+							} else {
+								return intMod;
+							}
+						})
+						.then(modifiers => {
+							die.modifiers = modifiers;
+							return die;
+						});
+					});
+				}
+				return result.then((die) => {
+					// Sum modifiers
+					if(die.modifiers && die.modifiers.length) {
+						die.modifierTotal = die.modifiers.reduce((t,m) => (m ? t + m : t), 0);
+						die.modifierStr = ((die.modifierTotal > 0) ? '+' : '-') + Math.abs(die.modifierTotal);
+						die.finalTotal = Math.max(0, die.total + die.modifierTotal);
+					} else {
+						die.modifierTotal = 0;
+						die.modifierStr = '';
+						die.finalTotal = Math.max(0, die.total);
 					}
-					results.modifierTotal += die.modifier;
-				}
+					
+					return die;
+				});
+			})
+			.then((dice) => {
+				const result = {
+					dice,
+					total: dice.reduce((t,d) => t + d.total, 0),
+					modifierTotal: dice.reduce((t,d) => t + d.modifierTotal, 0)
+				};
 				
-				die.modifierStr = ((die.modifier > 0) ? '+' : '-') + Math.abs(die.modifier);
-				die.finalTotal = Math.max(0, die.total + die.modifier);
+				result.modifierTotalStr = ((result.modifierTotal > 0) ? '+' : '-') + Math.abs(result.modifierTotal);
+				result.finalTotal = Math.max(0, result.total + result.modifierTotal);
+
+				return result;
 			});
-			
-			results.modifierTotalStr = ((results.modifierTotal > 0) ? '+' : '-') + Math.abs(results.modifierTotal);
-			results.finalTotal = Math.max(0, results.total + results.modifierTotal);
-			
-			return results;
 		} else {
-			throw new Error('Unable to parse the dice')
+			Bluebird.reject(new Error('Unable to parse the dice'));
 		}
 	}
 };

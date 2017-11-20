@@ -27,20 +27,23 @@ class TimezoneMixin extends BotBase {
 			helpText: 'Set your local time zone. `place` is your address or a nearby city.',
 			args: ['place'],
 			method: 'command__tz',
-			parseParams: false
+			parseParams: false,
+			sort: 10
 		};
 		
 		this.commands['tzdelete'] = {
 			helpText: 'Clear your time zone information.',
 			method: 'command__tzDelete',
-			parseParams: false
+			parseParams: false,
+			sort: 11
 		};
 		
 		this.commands['whenis'] = {
 			helpText: 'Look up someone’s information. You can look up several people at once.',
 			args: ['name', '(…name)'],
 			method: 'command__whenIs',
-			parseParams: false
+			parseParams: false,
+			sort: 12
 		};
 	}
 	
