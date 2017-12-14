@@ -33,6 +33,30 @@ class ExistingCharacter extends Error {
 
 const capitalize = (string) => string.charAt(0).toUpperCase() + string.slice(1);
 
+/**
+ * TODO:
+ * 	- Display level when class isn't present
+ * 	- Show stats on freeform characters
+ *  - Add calculated stats for templated characters
+ */
+const walkthroughSteps = {
+	intro: {
+	
+	},
+	template: {
+		open: `What kind of character did you want to create? I know about ` +
+			`\`${Object.keys(CharacterTemplates).join('`, `')}\`. If you ` +
+			`don’t want to use a template, just say \`none\`.`,
+		process: function(data) {
+		
+		},
+		close: function(data) {
+		
+		}
+	}
+};
+const walkthroughStepNames = ['template','name','race','class','occupation','description','image','stats','info'];
+
 module.exports = (BotBase) => {
 	class CharacterMixin extends BotBase {
 		constructor() {
@@ -68,15 +92,20 @@ module.exports = (BotBase) => {
 				method: 'command__playas',
 				parseParams: false,
 				sort: 9993
-			}
+			};
+			
+			this.bot.on('message', this.walkthrough.bind(this));
+			this.walkthroughTracker = {};
 		}
-		
+
 		command__character(params, message) {
 			const parsedParams = ParseCommand(params);
 			const command = parsedParams._.shift();
 			switch(command) {
 				case 'help':
 					return this.characterHelp(message);
+				/*case 'walkthrough':
+					return this.startWalkthrough(message); */
 				case 'create':
 				case 'new':
 					return this.newCharacter(parsedParams, message);
@@ -84,19 +113,15 @@ module.exports = (BotBase) => {
 					return this.deleteCharacter(params.replace(command,''), message);
 				case 'stat':
 					return this.characterStat(parsedParams, message);
-					break;
 				case 'info':
 					return this.characterInfo(params.replace(command,''), message);
-					break;
 				case 'pic':
 				case 'picture':
 				case 'photo':
 				case 'image':
 					return this.characterPic(params, message);
-					break;
 				case 'sheet':
 					return this.characterSheet(params.replace(command,''), message);
-					break;
 				default:
 					return this.fail(message);
 			}
@@ -138,6 +163,75 @@ module.exports = (BotBase) => {
 				});
 		}
 		
+		startWalkthrough(message) {
+			const track = (this.walkthroughTracker[message.author.id] = {
+				server: message.guild.id,
+				timeout: setTimeout(() => {
+					delete this.walkthroughTracker[message.author.id];
+				}, 21600000), // 6h in ms
+				character: {},
+				step: 0,
+				promise: null
+			});
+			
+			
+			message.author.sendMessage(`Hello! You wanted to set up a character on the ${message.guild.name} server? ` +
+				`What fun! I’ll walk you through the process. If you want to cancel at anytime, just ` +
+				`yell \`ABORT\`, and I’ll forget this ever happened. You can also skip any questions by saying ` +
+				`\`skip\`. Just so you know, you’re able to change any info about your character at any time, so ` +
+				`feel free to experiment! Now let’s get started.`);
+		}
+		
+		
+		walkthrough(message) {
+			if(message.channel.type === 'dm' && message.author.id !== this.bot.user.id) {
+				if(!this.walkthroughTracker[message.author.id]) {
+					return this.fail(message);
+				}
+				
+				const track = this.walkthroughTracker[message.author.id];
+				if(message.content === 'ABORT') {
+					clearTimeout(track.timeout);
+					delete this.walkthroughTracker[message.author.id];
+				}
+				
+				if(track.promise) {
+					this.walkthroughStep(track, message);
+				} else {
+					return this.fail(message);
+				}
+			}
+		}
+		
+		walkthroughStep(track, message) {
+			const step = walkthroughSteps[walkthroughStepNames[track.step]];
+			
+			track.promise = track.promise.then((character) => {
+				return track.process(character, message);
+			})
+			.then((character) => {
+			
+			});
+		}
+		
+		/*walkthroughTemplate(message, track) {
+			if(CharacterTemplates[message.content]) {
+				track.character.template = message.content;
+				const template = CharacterTemplates[message.content];
+				setTimeout(() => {
+					message.author.sendMessage(`Got it! I’ll keep track of their ${template.game} stats.`);
+				}, 3000);
+			} else if(message.content === 'none' || message.content === 'skip') {
+				setTimeout(() => {
+					message.author.sendMessage(`Got it! I’ll keep track of their free form stats.`);
+				}, 3000);
+			} else {
+				return this.fail(message);
+			}
+			
+		}*/
+		
+		
 		newCharacter(params, message) {
 			const name = params._.join(' ');
 			return this.createCharacter(name, params.type, message)
@@ -172,6 +266,8 @@ module.exports = (BotBase) => {
 				
 				return this.getSetting(message.member, true)
 				.then((userSettings) => {
+					userSettings = userSettings || {};
+					
 					// Setup the storage, if they're not set
 					userSettings.characters = userSettings.characters || [];
 					
@@ -327,7 +423,7 @@ module.exports = (BotBase) => {
 							});
 						} else {
 							// Not a valid stat. Let the user know
-							return message.channel.send(`I don’t think ${stat} is used in ${template.game}.` +
+							return message.channel.send(`I don’t think ${stat} is used in ${template.game}. ` +
 								`Possible options: ${Object.keys(template.stats).join(', ')}`);
 						}
 						// No value. Display the stat
@@ -650,7 +746,7 @@ module.exports = (BotBase) => {
 				}
 			}
 			
-			if(character.template) {
+			if(character.template && CharacterTemplates[character.template]) {
 				replyObj.footer = {
 					text: `A ${CharacterTemplates[character.template].game} character - Played by ${member.displayName}`
 				};
@@ -669,6 +765,8 @@ module.exports = (BotBase) => {
 				} else {
 					replyObj.fields.push({ name: "Class", value: character.class });
 				}
+			} else if(character.level) {
+				replyObj.fields.push({ name: "Level", value: character.level });
 			}
 			if(character.occupation || character.job) {
 				replyObj.fields.push({ name: "Occupation", value: character.occupation || character.job });
@@ -686,6 +784,11 @@ module.exports = (BotBase) => {
 						statVal = `${modifier > 0 ? '+' + modifier : modifier} (${character.stats[stat]})`;
 					}
 					replyObj.fields.push({ name: statName, value: statVal, inline: true });
+				});
+			} else if(character.stats) {
+				const statKeys = Object.keys(character.stats);
+				statKeys.forEach((stat) => {
+					replyObj.fields.push({ name: stat, value: character.stats[stat], inline: true });
 				});
 			}
 			

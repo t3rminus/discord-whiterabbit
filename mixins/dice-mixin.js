@@ -29,7 +29,7 @@ class DiceMixin extends BotBase {
 			diceResult.dice.forEach((die) => {
 				// Base message for each type of die
 				resultMessage += `Rolled ${die.count}d${die.max}: ${die.results.join(', ')}`;
-				if(die.modifier !== null) {
+				if(die.modifierTotal) {
 					// Result with modifier
 					resultMessage += ` (with ${die.modifierStr}) = ** ${die.finalTotal}**`;
 				} else if(die.count > 1) {
@@ -44,7 +44,7 @@ class DiceMixin extends BotBase {
 			// Special cases
 			if(diceResult.dice.length > 1) {
 				// Sum up all rolls for a final total
-				if(diceResult.modifierTotal !== null) {
+				if(diceResult.modifierTotal) {
 					// If there were modifiers, show result with and without
 					resultMessage += `Final total: ** ${diceResult.finalTotal}** (**${diceResult.total}** without modifiers)`;
 				} else {
@@ -56,7 +56,7 @@ class DiceMixin extends BotBase {
 				resultMessage = `Rolled 1d${singleDie.max}: **${singleDie.total}**! CRITICAL HIT! :tada: :confetti_ball:`;
 				
 				// Did we have modifiers
-				if(singleDie.modifier) {
+				if(singleDie.modifierTotal) {
 					resultMessage += `\n ${singleDie.total} with ${singleDie.modifierStr} = **${singleDie.finalTotal}**`;
 				}
 			} else if(diceResult.dice.length === 1 && singleDie.count === 1 && singleDie.total === 1) {
@@ -64,7 +64,7 @@ class DiceMixin extends BotBase {
 				resultMessage = `Rolled 1d${singleDie.max}: **1** …critical failure :confounded:`;
 				
 				// If we had modifiers, show them
-				if(singleDie.modifier) {
+				if(singleDie.modifierTotal) {
 					resultMessage += `\n 1 with ${singleDie.modifierStr} = **${singleDie.finalTotal}**`;
 				}
 			}
@@ -175,7 +175,7 @@ class DiceMixin extends BotBase {
 				return result;
 			});
 		} else {
-			Bluebird.reject(new Error('Unable to parse the dice'));
+			return Bluebird.reject(new Error('Unable to parse the dice'));
 		}
 	}
 };
