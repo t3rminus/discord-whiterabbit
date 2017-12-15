@@ -29,6 +29,7 @@
     "minimist-string": "^1.0.2",
     "mixwith": "^0.1.1",
     "moment-timezone": "^0.5.13",
+    "node-schedule": "^1.2.5",
     "request": "^2.83.0",
     "request-promise": "^4.2.2"
   },
