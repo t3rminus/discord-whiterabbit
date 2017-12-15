@@ -1,6 +1,7 @@
 'use strict';
 
-const Bluebird = require('bluebird');
+const Bluebird = require('bluebird'),
+	Random = require("random-js");
 
 module.exports = (BotBase) =>
 class DiceMixin extends BotBase {
@@ -14,7 +15,7 @@ class DiceMixin extends BotBase {
 			parseParams: false
 		};
 	}
-
+	
 	command__roll(params, message) {
 		params = params.trim();
 		return this.diceRoll(params, message).then((diceResult) => {
@@ -73,7 +74,7 @@ class DiceMixin extends BotBase {
 			message.channel.send(resultMessage);
 		});
 	}
-
+	
 	diceRoll(diceCommand, message) {
 		let error = false;
 		
@@ -111,12 +112,14 @@ class DiceMixin extends BotBase {
 		}
 		
 		if(!error) {
+			const random = new Random(Random.engines.browserCrypto);
+
 			return Bluebird.map(dice, (die) => {
 				die.results = [];
 				die.total = 0;
 				
 				for(let i = 0; i < die.count; i++) {
-					const roll = Math.floor((Math.random() * die.max) + 1);
+					const roll = random.die(die.max);
 					die.results.push(roll);
 					die.total += roll;
 				}
@@ -171,7 +174,7 @@ class DiceMixin extends BotBase {
 				
 				result.modifierTotalStr = ((result.modifierTotal > 0) ? '+' : '-') + Math.abs(result.modifierTotal);
 				result.finalTotal = Math.max(0, result.total + result.modifierTotal);
-
+				
 				return result;
 			});
 		} else {
