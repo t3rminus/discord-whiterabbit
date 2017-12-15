@@ -1,6 +1,7 @@
 'use strict';
 
-const Bluebird = require('bluebird');
+const Bluebird = require('bluebird'),
+	Random = require("random-js");
 
 module.exports = (BotBase) =>
 class DiceMixin extends BotBase {
@@ -14,7 +15,7 @@ class DiceMixin extends BotBase {
 			parseParams: false
 		};
 	}
-
+	
 	command__roll(params, message) {
 		params = params.trim();
 		return this.diceRoll(params, message).then((diceResult) => {
@@ -29,7 +30,7 @@ class DiceMixin extends BotBase {
 			diceResult.dice.forEach((die) => {
 				// Base message for each type of die
 				resultMessage += `Rolled ${die.count}d${die.max}: ${die.results.join(', ')}`;
-				if(die.modifier !== null) {
+				if(die.modifierTotal) {
 					// Result with modifier
 					resultMessage += ` (with ${die.modifierStr}) = ** ${die.finalTotal}**`;
 				} else if(die.count > 1) {
@@ -44,7 +45,7 @@ class DiceMixin extends BotBase {
 			// Special cases
 			if(diceResult.dice.length > 1) {
 				// Sum up all rolls for a final total
-				if(diceResult.modifierTotal !== null) {
+				if(diceResult.modifierTotal) {
 					// If there were modifiers, show result with and without
 					resultMessage += `Final total: ** ${diceResult.finalTotal}** (**${diceResult.total}** without modifiers)`;
 				} else {
@@ -56,7 +57,7 @@ class DiceMixin extends BotBase {
 				resultMessage = `Rolled 1d${singleDie.max}: **${singleDie.total}**! CRITICAL HIT! :tada: :confetti_ball:`;
 				
 				// Did we have modifiers
-				if(singleDie.modifier) {
+				if(singleDie.modifierTotal) {
 					resultMessage += `\n ${singleDie.total} with ${singleDie.modifierStr} = **${singleDie.finalTotal}**`;
 				}
 			} else if(diceResult.dice.length === 1 && singleDie.count === 1 && singleDie.total === 1) {
@@ -64,7 +65,7 @@ class DiceMixin extends BotBase {
 				resultMessage = `Rolled 1d${singleDie.max}: **1** …critical failure :confounded:`;
 				
 				// If we had modifiers, show them
-				if(singleDie.modifier) {
+				if(singleDie.modifierTotal) {
 					resultMessage += `\n 1 with ${singleDie.modifierStr} = **${singleDie.finalTotal}**`;
 				}
 			}
@@ -73,7 +74,7 @@ class DiceMixin extends BotBase {
 			message.channel.send(resultMessage);
 		});
 	}
-
+	
 	diceRoll(diceCommand, message) {
 		let error = false;
 		
@@ -111,12 +112,14 @@ class DiceMixin extends BotBase {
 		}
 		
 		if(!error) {
+			const random = new Random(Random.engines.browserCrypto);
+
 			return Bluebird.map(dice, (die) => {
 				die.results = [];
 				die.total = 0;
 				
 				for(let i = 0; i < die.count; i++) {
-					const roll = Math.floor((Math.random() * die.max) + 1);
+					const roll = random.die(die.max);
 					die.results.push(roll);
 					die.total += roll;
 				}
@@ -171,11 +174,11 @@ class DiceMixin extends BotBase {
 				
 				result.modifierTotalStr = ((result.modifierTotal > 0) ? '+' : '-') + Math.abs(result.modifierTotal);
 				result.finalTotal = Math.max(0, result.total + result.modifierTotal);
-
+				
 				return result;
 			});
 		} else {
-			Bluebird.reject(new Error('Unable to parse the dice'));
+			return Bluebird.reject(new Error('Unable to parse the dice'));
 		}
 	}
 };
