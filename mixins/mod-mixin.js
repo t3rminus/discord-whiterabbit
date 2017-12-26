@@ -1,5 +1,4 @@
 'use strict';
-const Bluebird = require('bluebird');
 
 module.exports = (BotBase) =>
 	class ModMixin extends BotBase {
@@ -36,6 +35,6 @@ module.exports = (BotBase) =>
 						console.log(err);
 						return message.channel.send('How dreadful! I wasn’t permitted to behead any messages. You may need to invite me again!');
 					});
-			});
+			}, () => {});
 		}
 	};
