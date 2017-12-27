@@ -7,7 +7,7 @@ const butt = Jimp.read('images/cat_butt.png'),
 	head = Jimp.read('images/cat_head.png'),
 	fuzz = Jimp.read('images/cat_fuzz.png');
 
-const boiHeight = 50;
+const boiHeight = 60;
 
 const MEOW_API = 'https://random.cat/meow';
 const WOOF_API = 'https://random.dog/woof';
