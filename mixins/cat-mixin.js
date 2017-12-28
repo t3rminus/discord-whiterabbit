@@ -7,7 +7,7 @@ const butt = Jimp.read('images/cat_butt.png'),
 	head = Jimp.read('images/cat_head.png'),
 	fuzz = Jimp.read('images/cat_fuzz.png');
 
-const boiHeight = 50;
+const boiHeight = 60;
 
 const MEOW_API = 'https://random.cat/meow';
 const WOOF_API = 'https://random.dog/woof';
@@ -18,7 +18,7 @@ module.exports = (BotBase) =>
 			super();
 			
 			this.commands['longcat'] = {
-				helpText: 'Longcat is how long? Alias: ?cat, ?caat, ?caaat, etc.',
+				helpText: 'Longcat is how long? Alias: {prefix}cat, {prefix}caat, {prefix}caaat, etc.',
 				args: ['#'],
 				method: 'command__longcat'
 			};
@@ -62,7 +62,7 @@ module.exports = (BotBase) =>
 						});
 				})
 				.then(imgBuffer => {
-					return message.channel.send(new this.Discord.Attachment(imgBuffer, 'cat.png'));
+					return message.channel.send(new BotBase.Discord.Attachment(imgBuffer, 'cat.png'));
 				});
 		}
 		
@@ -70,18 +70,18 @@ module.exports = (BotBase) =>
 			return pr.get(MEOW_API)
 				.then(JSON.parse)
 				.then(({file}) => {
-					return message.channel.send(new this.Discord.Attachment(file, file));
+					return message.channel.send(new BotBase.Discord.Attachment(file, file));
 				});
 		}
 		
 		command__woof(params, message, count) {
 			if(count && count > 5) {
-				return message.channel.send('Good heavens! I’m having a bit of trouble getting a doggo for you!');
+				return message.channel.send('Good heavens! I’m having a bit of trouble getting a doggo for you right now!');
 			}
 			return pr.get(WOOF_API)
 				.then(file => {
 					if(/.jpe?g$/i.test(file)) {
-						return message.channel.send(new this.Discord.Attachment(`https://random.dog/${file}`, file));
+						return message.channel.send(new BotBase.Discord.Attachment(`https://random.dog/${file}`, file));
 					} else {
 						return this.command__woof(params, message, count ? count + 1 : 1);
 					}
@@ -89,9 +89,18 @@ module.exports = (BotBase) =>
 		}
 		
 		isACat(message) {
-			const match = /^\?c(a+)t\s*$/.exec(message.content);
-			if(match && match.length && match[1]) {
-				return this.command__longcat({'_':[match[1].length]}, message);
+			if(message.member && message.member.id !== this.bot.user.id) {
+				this.getServerSettings(message)
+				.then((settings) => {
+					const prefix = settings.prefix || '?';
+					// Match command at beginning of message
+					const matchCmd = new RegExp(`^${BotBase.Misc.escapeRegex(prefix)}c(a+)t(\s*|$)`);
+					const match = matchCmd.exec(message.content);
+
+					if(match && match.length && match[1]) {
+						return this.command__longcat({'_':[match[1].length]}, message);
+					}
+				});
 			}
 		}
 		

@@ -89,7 +89,7 @@ class DnDSpellMixin extends BotBase {
 				spellInfo.level = 'Cantrip'
 			}
 			
-			const reply = new this.Discord.RichEmbed({
+			const reply = new BotBase.Discord.RichEmbed({
 				title: spellInfo.ritual ? spellInfo.name + ' (Ritual)' : spellInfo.name,
 				description: spellInfo.description,
 				thumbnail: {

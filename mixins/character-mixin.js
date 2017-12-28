@@ -799,7 +799,7 @@ module.exports = (BotBase) => {
 				replyObj.fields.push({ name: capitalize(info), value: character[info] });
 			});
 			
-			const replyEmbed = new this.Discord.RichEmbed(replyObj);
+			const replyEmbed = new BotBase.Discord.RichEmbed(replyObj);
 			
 			return message.channel.send({ embed: replyEmbed });
 		}
