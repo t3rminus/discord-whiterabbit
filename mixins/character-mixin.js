@@ -22,6 +22,33 @@ const CharacterTemplates = {
 			'hp': { name: 'Hit Point Maximum', abbrev: 'Max HP' },
 			'speed': { name: 'Speed' },
 			'exp': { name: 'Experience', abbrev: 'XP' }
+		},
+		derivedStats: {
+			'level': {
+				name: 'Level',
+				calc: (character) => {
+					const exp = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,
+								 100000,120000,140000,165000,195000,225000,265000,305000,355000];
+					return exp.findIndex((i) => character.exp < i) + 1;
+				}
+			},
+			'prof': {
+				name: 'Proficiency',
+				calc: (character) => {
+					const level = CharacterTemplates['d&d5e'].derivedStats.level(character);
+					if(level > 16) {
+						return 6;
+					} else if(level > 12) {
+						return 5;
+					} else if(level > 8) {
+						return 4;
+					} else if(level > 4) {
+						return 3;
+					} else {
+						return 2;
+					}
+				}
+			}
 		}
 	}
 };
@@ -39,23 +66,159 @@ const capitalize = (string) => string.charAt(0).toUpperCase() + string.slice(1);
  * 	- Show stats on freeform characters
  *  - Add calculated stats for templated characters
  */
-const walkthroughSteps = {
-	intro: {
-	
-	},
-	template: {
-		open: `What kind of character did you want to create? I know about ` +
+const isSkip = (m,s) => ((m && m.content || `${m}`)).toLowerCase()
+	.trim().replace(/(^[^a-z]+|[^a-z]$)/gi,'') === (s || 'skip');
+
+const walkthroughSteps = [
+	{
+		step: 'template',
+		open: function() {
+			return `What kind of character did you want to create? I know about ` +
 			`\`${Object.keys(CharacterTemplates).join('`, `')}\`. If you ` +
-			`don’t want to use a template, just say \`none\`.`,
-		process: function(data) {
-		
+			`don’t want to use a template, just say \`none\`.`;
 		},
-		close: function(data) {
-		
+		process: function(track, message) {
+			if(CharacterTemplates[message.content]) {
+				track.character.template = message.content;
+				return message.author.sendMessage(`Got it! I’ll keep track of their ` +
+					`${CharacterTemplates[message.content].game} stats.`).then(() => true);
+			} else if(isSkip(message) || isSkip(message, 'none')) {
+				return message.author.sendMessage(`Got it! I’ll keep track of their free form stats.`)
+					.then(() => true);
+			} else {
+				throw new Error(`Hmm... I’m not quite sure what you mean.`);
+			}
 		}
-	}
-};
-const walkthroughStepNames = ['template','name','race','class','occupation','description','image','stats','info'];
+	},
+	{
+		step: 'name',
+		open: function() {
+			return `What is your character’s name?`;
+		},
+		process: function(track, message, bot) {
+			if(isSkip(message)) {
+				throw new Error('Sorry, this is the one thing I can’t skip.');
+			}
+			const name = message.content;
+			return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
+			.then((result) => {
+				if(result) {
+					throw new Error(`That’s very similar to someone else’s ` +
+						`character "${result.character}"… Try something else to avoid confusion.`);
+				}
+				
+				track.character.name = message.content;
+				return message.author.sendMessage(`Nice to meet you, ${name}!`)
+					.then(() => true);
+			});
+		},
+		repeat: function() {
+			return `Got any other ideas for a name for your character?`;
+		}
+	},
+	{
+		step: 'description',
+		open: function(track) {
+			return `Tell me about ${track.character.name}. What do they like? How do they dress? Where are they from? ` +
+				`Give me all the details of their life, so I know exactly who they are.`;
+		},
+		process: function(track, message) {
+			if(isSkip(message) || isSkip(message,'no')) {
+				return message.author.sendMessage(`Moving right along!`)
+					.then(() => true);
+			} else {
+				track.character.description = message.content;
+				return message.author.sendMessage(`Wonderful!`)
+					.then(() => true);
+			}
+		}
+	},
+	{
+		step: 'pic',
+		open: function() {
+			return `Do you have a picture of your character you’d like to use? If you do, please send it to me!`;
+		},
+		process: function(track, message) {
+			if(isSkip(message) || isSkip(message,'no')) {
+				return message.author.sendMessage(`I shan’t give it another thought!`)
+					.then(() => true);
+			} else {
+				let image;
+				if(message.attachments && message.attachments.size) {
+					image = message.attachments.first();
+				} else  {
+					throw new Error('Whoops! There didn’t seem to be an picture with that message.');
+				}
+				
+				track.character.image = image.url;
+				return message.author.sendMessage(`Wow! Now I know what ${track.character.name} looks like.`);
+			}
+		}
+	},
+	{
+		step: 'info',
+		open: function() {
+			return `Now let’s work on some details. What information would you like to add? For instance,` +
+				` you can say something like \`job\`, \`class\`, or \`race\`.`;
+		},
+		repeat: function() {
+			return `Is there any other information you want to add? You can say \`job\`, \`class\`, or \`race\`, or ` +
+				`really anything at all! If you’ve entered everything you want, say \`done\`.`;
+		},
+		process: function(track, message) {
+			if(isSkip(message)) {
+				return message.author.sendMessage(`Okay! Skipping that for now.`)
+					.then(() => 6);
+			} else if(isSkip(message,'done')) {
+				return message.author.sendMessage(`Fantastic! All information saved.`)
+					.then(() => 6);
+			} else {
+				track.nextInfo = message.content;
+				return true;
+			}
+		}
+	},
+	{
+		step: 'info_value',
+		open: function(track) {
+			return `Okay! What should I put down for ${track.nextInfo}?`;
+		},
+		process: function(track, message) {
+			const info = track.nextInfo;
+			delete track.nextInfo;
+			
+			if(isSkip(message)) {
+				return message.author.sendMessage(`Got it! Skipping for now!`)
+					.then(() => 6);
+			}
+			
+			track.character[info] = message.content;
+			return message.author.sendMessage(`Good! Noted.`)
+				.then(() => 4);
+		}
+	}/*,
+	{
+		step: 'stat',
+		open: function(track) {
+			return `Ok! Since we’re setting up a ${CharacterTemplates[track.character.template].game}` +
+				` character, we need to `
+		},
+		process: function(track, message) {
+			const info = track.nextInfo;
+			delete track.nextInfo;
+			
+			if(isSkip(message)) {
+				return message.author.sendMessage(`Got it! Skipping for now!`)
+				.then(() => 6);
+			}
+			
+			track.character[info] = message.content;
+			return message.author.sendMessage(`Good! Noted.`)
+			.then(() => 4);
+		}
+	}*/
+	// TODO: this ^
+];
 
 module.exports = (BotBase) => {
 	class CharacterMixin extends BotBase {
@@ -104,8 +267,8 @@ module.exports = (BotBase) => {
 			switch(command) {
 				case 'help':
 					return this.characterHelp(message);
-				/*case 'walkthrough':
-					return this.startWalkthrough(message); */
+				case 'walkthrough':
+					return this.startWalkthrough(message);
 				case 'create':
 				case 'new':
 					return this.newCharacter(parsedParams, message);
@@ -165,21 +328,32 @@ module.exports = (BotBase) => {
 		
 		startWalkthrough(message) {
 			const track = (this.walkthroughTracker[message.author.id] = {
+				user: message.author.id,
 				server: message.guild.id,
+				member: {id: message.author.id, guild: { id: message.guild.id }},
 				timeout: setTimeout(() => {
 					delete this.walkthroughTracker[message.author.id];
 				}, 21600000), // 6h in ms
 				character: {},
 				step: 0,
-				promise: null
+				completedSteps: [],
+				ready: true
 			});
 			
-			
-			message.author.sendMessage(`Hello! You wanted to set up a character on the ${message.guild.name} server? ` +
-				`What fun! I’ll walk you through the process. If you want to cancel at anytime, just ` +
-				`yell \`ABORT\`, and I’ll forget this ever happened. You can also skip any questions by saying ` +
-				`\`skip\`. Just so you know, you’re able to change any info about your character at any time, so ` +
-				`feel free to experiment! Now let’s get started.`);
+			return Bluebird.try(() => {
+				return message.author.sendMessage(`Hello! You wanted to set up a character on the ${message.guild.name} server? ` +
+					`What fun! I’ll walk you through the process. If you want to cancel at anytime, just ` +
+					`yell \`ABORT\`, and I’ll forget this ever happened. You can also skip any questions by saying ` +
+					`\`skip\`. Just so you know, you’re able to change any info about your character at any time, so ` +
+					`feel free to experiment! Now let’s get started.`);
+			})
+			.delay(500)
+			.then(() => {
+				const step = walkthroughSteps[track.step];
+				return Bluebird.resolve(step.open(track, message)).then((text) => {
+					return message.author.sendMessage(text);
+				});
+			});
 		}
 		
 		
@@ -188,6 +362,9 @@ module.exports = (BotBase) => {
 				if(!this.walkthroughTracker[message.author.id]) {
 					return this.fail(message);
 				}
+				if(!this.walkthroughTracker[message.author.id].ready) {
+					return;
+				}
 				
 				const track = this.walkthroughTracker[message.author.id];
 				if(message.content === 'ABORT') {
@@ -195,74 +372,93 @@ module.exports = (BotBase) => {
 					delete this.walkthroughTracker[message.author.id];
 				}
 				
-				if(track.promise) {
-					this.walkthroughStep(track, message);
-				} else {
-					return this.fail(message);
-				}
+				return this.walkthroughStep(track, message);
 			}
 		}
 		
 		walkthroughStep(track, message) {
-			const step = walkthroughSteps[walkthroughStepNames[track.step]];
-			
-			track.promise = track.promise.then((character) => {
-				return track.process(character, message);
+			let step = walkthroughSteps[track.step];
+			track.ready = false;
+			return Bluebird.delay(500)
+			.then(() => {
+				return Bluebird.resolve(step.process(track, message, this));
 			})
-			.then((character) => {
-			
+			.delay(2000)
+			.then((processResult) => {
+				if(processResult) {
+					track.completedSteps.push(track.step);
+					
+					if(processResult === true) {
+						track.step++;
+					} else {
+						track.step = processResult;
+					}
+					
+					if(track.step < walkthroughSteps.length) {
+						step = walkthroughSteps[track.step];
+						const open = step.repeat && track.completedSteps.indexOf(track.step) > -1 ? step.repeat : step.open;
+						return Bluebird.resolve(open(track, message, this))
+						.then((text) => {
+							track.ready = true;
+							return message.author.sendMessage(text);
+						});
+					} else {
+						return this.saveCharacter(track.character, {member: track.member, author: {id: track.user}})
+						.then((character) => {
+							clearTimeout(track.timeout);
+							delete this.walkthroughTracker[message.author.id];
+							return message.author.sendMessage(`Terrific! I’ve set you up to play ` +
+								`as ${character.name}. I hope you have lots of fun!`);
+						})
+						.catch(ExistingCharacter, () => {
+							
+							return message.author.sendMessage(`Well, this is really embarrassing. Before I could ` +
+								`save your character, it seems someone else created one with a similar name. I can’t` +
+								`really handle this situation yet. The only thing we can do is \`ABORT\`.`);
+						})
+						.catch((err) => {
+							console.log(err);
+							return message.author.sendMessage(`Well, this is really embarrassing. Something ` +
+								`strange just happened. Would you mind repeating that?`);
+						});
+					}
+				} else {
+					const retry = step.retry || step.open;
+					return Bluebird.resolve(retry(track, message, this))
+					.then((text) => {
+						track.ready = true;
+						return message.author.sendMessage(text);
+					});
+				}
+			})
+			.catch(err => {
+				return Bluebird.resolve(message.author.sendMessage(err.message))
+					.delay(500)
+					.then(() => {
+						if(step.step !== 'name') {
+							return message.author.sendMessage(`Let’s try this one more time. If you want, just say \`skip\` and we can move on.`);
+						} else {
+							return message.author.sendMessage(`Let’s try this one more time.`);
+						}
+					})
+					.then(() => {
+						return Bluebird.resolve(step.open(track, message, this))
+							.then((text) => {
+								track.ready = true;
+								return message.author.sendMessage(text);
+							});
+					});
 			});
 		}
 		
-		/*walkthroughTemplate(message, track) {
-			if(CharacterTemplates[message.content]) {
-				track.character.template = message.content;
-				const template = CharacterTemplates[message.content];
-				setTimeout(() => {
-					message.author.sendMessage(`Got it! I’ll keep track of their ${template.game} stats.`);
-				}, 3000);
-			} else if(message.content === 'none' || message.content === 'skip') {
-				setTimeout(() => {
-					message.author.sendMessage(`Got it! I’ll keep track of their free form stats.`);
-				}, 3000);
-			} else {
-				return this.fail(message);
-			}
-			
-		}*/
-		
-		
-		newCharacter(params, message) {
-			const name = params._.join(' ');
-			return this.createCharacter(name, params.type, message)
-			.then((character) => {
-				// Character created!
-				const type = (character.template && CharacterTemplates[character.template] &&
-					CharacterTemplates[character.template].game) || 'freeform';
-				return message.channel.send(`Nice to meet you, ${character.name}! I’ll keep track of your ${type} stats.`);
-			})
-			.catch(ExistingCharacter, (err) => {
-				// Oops name too similar.
-				return message.channel.send(`That’s very similar to ${err.result.user.displayName}’s ` +
-					`character "${err.result.character}"… Try something else to avoid confusion.`);
-			});
-		}
-		
-		createCharacter(name, template, message) {
-			return this.findCharacter(name, message, CharacterNameDistance)
+		saveCharacter(character, message) {
+			return this.findCharacter(character.name, message, CharacterNameDistance)
 			.then(result => {
 				if(result) {
 					const err = new ExistingCharacter();
 					err.result = result;
 					throw err;
 				}
-				
-				// Create the character!
-				const newChr = {
-					name: name
-				};
-				
-				newChr.template = template || null;
 				
 				return this.getSetting(message.member, true)
 				.then((userSettings) => {
@@ -272,8 +468,8 @@ module.exports = (BotBase) => {
 					userSettings.characters = userSettings.characters || [];
 					
 					// Add the character.
-					userSettings.currentCharacter = name;
-					userSettings.characters.push(newChr);
+					userSettings.currentCharacter = character.name;
+					userSettings.characters.push(character);
 					
 					// Update the global list
 					return this.getCharacterList(message.member)
@@ -287,8 +483,27 @@ module.exports = (BotBase) => {
 					});
 				})
 				.then(() => {
-					return newChr;
+					return character;
 				});
+			});
+		}
+		
+		newCharacter(params, message) {
+			const name = params._.join(' ');
+			const character = { name };
+			character.template = (params && params.type) || null;
+			
+			return this.saveCharacter(character, message)
+			.then((character) => {
+				// Character created!
+				const type = (character.template && CharacterTemplates[character.template] &&
+					CharacterTemplates[character.template].game) || 'freeform';
+				return message.channel.send(`Nice to meet you, ${character.name}! I’ll keep track of your ${type} stats.`);
+			})
+			.catch(ExistingCharacter, (err) => {
+				// Oops name too similar.
+				return message.channel.send(`That’s very similar to ${err.result.user.displayName}’s ` +
+					`character "${err.result.character}"… Try something else to avoid confusion.`);
 			});
 		}
 		
@@ -304,7 +519,8 @@ module.exports = (BotBase) => {
 						serverCharacters[userId].forEach(character => {
 							characters[character] = {
 								userId,
-								user: message.guild.members.get(userId),
+								user: message && message.guild && message.guild.members
+									? message.guild.members.get(userId) : { displayName: 'someone' },
 								character: character
 							};
 							chrNames.push(character);
@@ -328,12 +544,14 @@ module.exports = (BotBase) => {
 			return this.getSetting(member, '-characters')
 			.then((data) => {
 				data = data || {};
-				Object.keys(data).forEach((userId) => {
-					// Delete data for any members that have left
-					if(!member.guild.members.has(userId)) {
-						delete data[userId];
-					}
-				});
+				if(member.guild.members) {
+					Object.keys(data).forEach((userId) => {
+						// Delete data for any members that have left
+						if(!member.guild.members.has(userId)) {
+							delete data[userId];
+						}
+					});
+				}
 				
 				return data;
 			});
