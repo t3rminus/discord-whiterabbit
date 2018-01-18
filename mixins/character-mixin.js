@@ -2,7 +2,8 @@
 
 const Bluebird = require('bluebird'),
 	ParseCommand = require('minimist-string'),
-	FuzzyMatching = require('fuzzy-matching');
+	FuzzyMatching = require('fuzzy-matching'),
+	Misc = require('../lib/misc');
 
 const dnd5eModifier = function(val) {
 	return Math.floor((val - 10) / 2);
@@ -26,16 +27,25 @@ const CharacterTemplates = {
 		derivedStats: {
 			'level': {
 				name: 'Level',
+				abbrev: 'Level',
+				alias: ['lvl'],
 				calc: (character) => {
 					const exp = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,
 								 100000,120000,140000,165000,195000,225000,265000,305000,355000];
-					return exp.findIndex((i) => character.exp < i) + 1;
+					const level = exp.findIndex((i) => character.stats.exp < i) + 1;
+					return level || null;
 				}
 			},
-			'prof': {
+			'proficiency': {
 				name: 'Proficiency',
+				abbrev: 'Proficiency',
+				alias: ['prof','pro','pr'],
 				calc: (character) => {
-					const level = CharacterTemplates['d&d5e'].derivedStats.level(character);
+					const level = CharacterTemplates['d&d5e'].derivedStats.level.calc(character);
+					if(level === null) {
+						return null;
+					}
+					
 					if(level > 16) {
 						return 6;
 					} else if(level > 12) {
@@ -46,6 +56,29 @@ const CharacterTemplates = {
 						return 3;
 					} else {
 						return 2;
+					}
+				}
+			},
+			'initiative': {
+				name: 'Initiative',
+				abbrev: 'Initiative',
+				alias: ['init'],
+				calc: (character) => {
+					if(character.stats.dex) {
+						return CharacterTemplates['d&d5e'].stats.dex.calc(character.stats.dex);
+					} else {
+						return null;
+					}
+				}
+			},
+			'passive_perception': {
+				name: 'Passive Perception',
+				abbrev: 'Passive Perception',
+				calc: (character) => {
+					if(character.stats.wis) {
+						return 10 + CharacterTemplates['d&d5e'].stats.wis.calc(character.stats.wis);
+					} else {
+						return null;
 					}
 				}
 			}
@@ -71,6 +104,7 @@ const isSkip = (m,s) => ((m && m.content || `${m}`)).toLowerCase()
 
 const walkthroughSteps = [
 	{
+		// 0
 		step: 'template',
 		open: function() {
 			return `What kind of character did you want to create? I know about ` +
@@ -80,6 +114,7 @@ const walkthroughSteps = [
 		process: function(track, message) {
 			if(CharacterTemplates[message.content]) {
 				track.character.template = message.content;
+				track.stats = Object.keys(CharacterTemplates[message.content].stats);
 				return message.author.sendMessage(`Got it! I’ll keep track of their ` +
 					`${CharacterTemplates[message.content].game} stats.`).then(() => true);
 			} else if(isSkip(message) || isSkip(message, 'none')) {
@@ -91,6 +126,7 @@ const walkthroughSteps = [
 		}
 	},
 	{
+		// 1
 		step: 'name',
 		open: function() {
 			return `What is your character’s name?`;
@@ -108,7 +144,7 @@ const walkthroughSteps = [
 				}
 				
 				track.character.name = message.content;
-				return message.author.sendMessage(`Nice to meet you, ${name}!`)
+				return message.author.sendMessage(`Okay! Their name is ${name}!`)
 					.then(() => true);
 			});
 		},
@@ -117,6 +153,7 @@ const walkthroughSteps = [
 		}
 	},
 	{
+		// 2
 		step: 'description',
 		open: function(track) {
 			return `Tell me about ${track.character.name}. What do they like? How do they dress? Where are they from? ` +
@@ -134,13 +171,14 @@ const walkthroughSteps = [
 		}
 	},
 	{
+		// 3
 		step: 'pic',
 		open: function() {
 			return `Do you have a picture of your character you’d like to use? If you do, please send it to me!`;
 		},
 		process: function(track, message) {
 			if(isSkip(message) || isSkip(message,'no')) {
-				return message.author.sendMessage(`I shan’t give it another thought!`)
+				return message.author.sendMessage(`No picture? That’s too bad, but you can always add it later.`)
 					.then(() => true);
 			} else {
 				let image;
@@ -151,11 +189,13 @@ const walkthroughSteps = [
 				}
 				
 				track.character.image = image.url;
-				return message.author.sendMessage(`Wow! Now I know what ${track.character.name} looks like.`);
+				return message.author.sendMessage(`Wow! Now I know what ${track.character.name} looks like.`)
+					.then(() => true);
 			}
 		}
 	},
 	{
+		// 4
 		step: 'info',
 		open: function() {
 			return `Now let’s work on some details. What information would you like to add? For instance,` +
@@ -167,11 +207,11 @@ const walkthroughSteps = [
 		},
 		process: function(track, message) {
 			if(isSkip(message)) {
-				return message.author.sendMessage(`Okay! Skipping that for now.`)
-					.then(() => 6);
+				return message.author.sendMessage(`Okay! Skipping this for now.`)
+					.then(() => 'stat');
 			} else if(isSkip(message,'done')) {
-				return message.author.sendMessage(`Fantastic! All information saved.`)
-					.then(() => 6);
+				return message.author.sendMessage(`Alright, done with info.`)
+					.then(() => 'stat');
 			} else {
 				track.nextInfo = message.content;
 				return true;
@@ -179,6 +219,7 @@ const walkthroughSteps = [
 		}
 	},
 	{
+		// 5
 		step: 'info_value',
 		open: function(track) {
 			return `Okay! What should I put down for ${track.nextInfo}?`;
@@ -188,36 +229,93 @@ const walkthroughSteps = [
 			delete track.nextInfo;
 			
 			if(isSkip(message)) {
-				return message.author.sendMessage(`Got it! Skipping for now!`)
-					.then(() => 6);
+				return message.author.sendMessage(`Got it! Next!`)
+					.then(() => 'stat');
 			}
 			
 			track.character[info] = message.content;
 			return message.author.sendMessage(`Good! Noted.`)
-				.then(() => 4);
+				.then(() => 'info');
 		}
-	}/*,
+	},
 	{
+		// 6
 		step: 'stat',
 		open: function(track) {
-			return `Ok! Since we’re setting up a ${CharacterTemplates[track.character.template].game}` +
-				` character, we need to `
+			track.curStat = track.stats[0];
+			const game = CharacterTemplates[track.character.template];
+			const statName = (game.stats[track.curStat].calc ? 'base ' : '')
+				+ game.stats[track.curStat].name.toLowerCase();
+			return `Ok! Since we’re setting up a ${game.game}` +
+				` character, I need some stats! What is their ${statName}?`;
+		},
+		repeat: function(track) {
+			track.curStat = track.stats[0];
+			const game = CharacterTemplates[track.character.template];
+			const statName = (game.stats[track.curStat].calc ? 'base ' : '')
+				+ game.stats[track.curStat].name.toLowerCase();
+			return `Okay, and what is their ${statName}?`;
 		},
 		process: function(track, message) {
-			const info = track.nextInfo;
-			delete track.nextInfo;
-			
 			if(isSkip(message)) {
-				return message.author.sendMessage(`Got it! Skipping for now!`)
-				.then(() => 6);
+				track.stats.shift();
+				return message.author.sendMessage(`Okay. You can set that later.`)
+					.then(() => 'stat');
 			}
 			
-			track.character[info] = message.content;
-			return message.author.sendMessage(`Good! Noted.`)
-			.then(() => 4);
+			const game = CharacterTemplates[track.character.template];
+			if(!track.character.stats) {
+				track.character.stats = {};
+			}
+			
+			track.character.stats[track.curStat] = message.content;
+			
+			return Bluebird.try(() => {
+				if(game.stats[track.curStat].calc) {
+					let calcVal = game.stats[track.curStat].calc(message.content);
+					if(calcVal > 0) {
+						calcVal = `+${calcVal}`;
+					}
+					return message.author.sendMessage(`Okay. ${game.stats[track.curStat].name} is ${message.content}` +
+						` which is ${calcVal}`);
+				} else {
+					return message.author.sendMessage(`Okay. ${game.stats[track.curStat].name} is ${message.content}`);
+				}
+			})
+			.then(() => {
+				track.stats.shift();
+				if(track.stats.length) {
+					return 'stat';
+				} else {
+					return 99; // End
+				}
+			});
 		}
-	}*/
-	// TODO: this ^
+	},
+	{
+		// 7
+		step: 'emergency_name',
+		open: function() {
+			return `Got any other ideas for a name for your character?`;
+		},
+		process: function(track, message, bot) {
+			if(isSkip(message)) {
+				throw new Error('Sorry, this is the one thing I can’t skip.');
+			}
+			const name = message.content;
+			return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
+			.then((result) => {
+				if(result) {
+					throw new Error(`That’s very similar to someone else’s ` +
+						`character "${result.character}"… Try something else to avoid confusion.`);
+				}
+				
+				track.character.name = message.content;
+				return message.author.sendMessage(`Nice to meet you, ${name}!`)
+				.then(() => 99); // End
+			});
+		}
+	}
 ];
 
 module.exports = (BotBase) => {
@@ -359,10 +457,7 @@ module.exports = (BotBase) => {
 		
 		walkthrough(message) {
 			if(message.channel.type === 'dm' && message.author.id !== this.bot.user.id) {
-				if(!this.walkthroughTracker[message.author.id]) {
-					return this.fail(message);
-				}
-				if(!this.walkthroughTracker[message.author.id].ready) {
+				if(!this.walkthroughTracker[message.author.id] || !this.walkthroughTracker[message.author.id].ready) {
 					return;
 				}
 				
@@ -370,6 +465,7 @@ module.exports = (BotBase) => {
 				if(message.content === 'ABORT') {
 					clearTimeout(track.timeout);
 					delete this.walkthroughTracker[message.author.id];
+					return message.author.sendMessage(`Abort! Sorry things didn’t work out.`);
 				}
 				
 				return this.walkthroughStep(track, message);
@@ -383,7 +479,7 @@ module.exports = (BotBase) => {
 			.then(() => {
 				return Bluebird.resolve(step.process(track, message, this));
 			})
-			.delay(2000)
+			.delay(500)
 			.then((processResult) => {
 				if(processResult) {
 					track.completedSteps.push(track.step);
@@ -391,11 +487,23 @@ module.exports = (BotBase) => {
 					if(processResult === true) {
 						track.step++;
 					} else {
-						track.step = processResult;
+						if(Misc.isString(processResult)) {
+							const nextStep = walkthroughSteps.findIndex(s => s.step === processResult);
+							if(nextStep >= 0) {
+								track.step = nextStep;
+							} else {
+								track.step++;
+							}
+						} else {
+							track.step = processResult;
+						}
 					}
 					
-					if(track.step < walkthroughSteps.length) {
+					const statNext = walkthroughSteps[track.step] && walkthroughSteps[track.step].step === 'stat';
+					const haveStats = track.stats && track.stats.length;
+					if(track.step < walkthroughSteps.length && (!statNext || haveStats)) {
 						step = walkthroughSteps[track.step];
+						
 						const open = step.repeat && track.completedSteps.indexOf(track.step) > -1 ? step.repeat : step.open;
 						return Bluebird.resolve(open(track, message, this))
 						.then((text) => {
@@ -408,13 +516,23 @@ module.exports = (BotBase) => {
 							clearTimeout(track.timeout);
 							delete this.walkthroughTracker[message.author.id];
 							return message.author.sendMessage(`Terrific! I’ve set you up to play ` +
-								`as ${character.name}. I hope you have lots of fun!`);
+								`as ${character.name}. I hope you have lots of fun!`)
+								.then(() => {
+									return this.renderSheet(character, { displayName: 'you'}, message);
+								});
 						})
 						.catch(ExistingCharacter, () => {
-							
 							return message.author.sendMessage(`Well, this is really embarrassing. Before I could ` +
-								`save your character, it seems someone else created one with a similar name. I can’t` +
-								`really handle this situation yet. The only thing we can do is \`ABORT\`.`);
+								`save your character, it seems someone else created one with a similar name.`)
+							.then(() => {
+								track.step = walkthroughSteps.findIndex(s => s.step === 'emergency_name');
+								step = walkthroughSteps[track.step];
+								return Bluebird.resolve(step.open(track, message, this))
+								.then((text) => {
+									track.ready = true;
+									return message.author.sendMessage(text);
+								});
+							});
 						})
 						.catch((err) => {
 							console.log(err);
@@ -974,6 +1092,17 @@ module.exports = (BotBase) => {
 				};
 			}
 			
+			// Set this here now
+			if(character.template && CharacterTemplates[character.template] &&
+				CharacterTemplates[character.template].derivedStats &&
+				CharacterTemplates[character.template].derivedStats.level &&
+				!character.level && !character.stats.level) {
+				const level = CharacterTemplates[character.template].derivedStats.level.calc(character);
+				if(level || level === 0) {
+					character.level = level;
+				}
+			}
+			
 			if(character.race) {
 				replyObj.fields.push({ name: "Race", value: character.race });
 			}
@@ -993,7 +1122,7 @@ module.exports = (BotBase) => {
 			
 			if(character.template && CharacterTemplates[character.template]) {
 				const template = CharacterTemplates[character.template];
-				const statKeys = Object.keys(CharacterTemplates[character.template].stats);
+				const statKeys = Object.keys(template.stats);
 				statKeys.forEach((stat) => {
 					const statName = template.stats[stat].abbrev || template.stats[stat].name;
 					let statVal = (character.stats && character.stats[stat]) || 'Not Set';
@@ -1003,6 +1132,19 @@ module.exports = (BotBase) => {
 					}
 					replyObj.fields.push({ name: statName, value: statVal, inline: true });
 				});
+				if(CharacterTemplates[character.template].derivedStats) {
+					const derivedKeys = Object.keys(template.derivedStats);
+					derivedKeys.forEach((stat) => {
+						if(stat === 'level' && character.level) {
+							return;
+						}
+						const statName = template.derivedStats[stat].abbrev || template.derivedStats[stat].name;
+						let statVal = template.derivedStats[stat].calc(character);
+						if(statVal || statVal === 0) {
+							replyObj.fields.push({ name: statName, value: statVal, inline: true });
+						}
+					});
+				}
 			} else if(character.stats) {
 				const statKeys = Object.keys(character.stats);
 				statKeys.forEach((stat) => {
@@ -1080,12 +1222,26 @@ module.exports = (BotBase) => {
 					template = CharacterTemplates[character.template];
 				}
 				
+				// TODO: clean this up
 				if(template && template.stats && template.stats[stat] && template.stats[stat].calc && character.stats[stat]) {
 					return template.stats[stat].calc(character.stats[stat]);
-				} else if(character.stats[stat]) {
-					const statVal = parseInt(character.stats[stat]);
-					return Number.isNaN(statVal) ? null : statVal;
+				} else if(template && template.derivedStats && template.derivedStats[stat]) {
+					return template.derivedStats[stat].calc(character);
 				} else {
+					if(character.stats[stat]) {
+						const statVal = parseInt(character.stats[stat]);
+						return Number.isNaN(statVal) ? null : statVal;
+					}
+					
+					if(template && template.derivedStats) {
+						const statKeys = Object.keys(template.derivedStats);
+						const match = statKeys.find(fs => fs.alias &&
+							(fs.alias === stat || (Array.isArray(fs.alias) && fs.alias.indexOf(stat) > -1)));
+						if(match) {
+							return template.derivedStats[match].calc(character);
+						}
+					}
+					
 					return null;
 				}
 			});
