@@ -4,7 +4,7 @@ const Path = require('path'),
 	fs = require('fs-extra'),
 	FuzzyMatching = require('fuzzy-matching');
 
-const SRC_URL = 'https://raw.githubusercontent.com/astranauta/astranauta.github.io/master/data/spells.json';
+const SRC_URL = 'https://pastebin.com/raw/dMyyshMX';
 const localFile = Path.join(process.cwd(), 'spells.json');
 
 const schools = {
@@ -120,7 +120,7 @@ class DnDSpellMixin extends BotBase {
 			.catch(() => {
 				return pr.get(SRC_URL)
 				.then((result) => {
-					result = result.replace(/^.+{/, '{');
+					result = result.replace(/^[^{]*{/, '{');
 					return fs.writeFile(localFile, result)
 					.then(() => result);
 				});
