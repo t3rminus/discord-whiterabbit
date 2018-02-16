@@ -30,10 +30,13 @@ const CharacterTemplates = {
 				abbrev: 'Level',
 				alias: ['lvl'],
 				calc: (character) => {
+					if(!character || !character.stats || !character.stats.exp) {
+						return null;
+					}
 					const exp = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,
-								 100000,120000,140000,165000,195000,225000,265000,305000,355000];
-					const level = exp.findIndex((i) => character.stats.exp < i) + 1;
-					return level || null;
+								 100000,120000,140000,165000,195000,225000,265000,305000,355000,Infinity];
+					const level = exp.findIndex((i) => character.stats.exp < i);
+					return Math.max(level, 1) || null;
 				}
 			},
 			'proficiency': {
