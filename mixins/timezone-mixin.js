@@ -45,6 +45,8 @@ class TimezoneMixin extends BotBase {
 			parseParams: false,
 			sort: 12
 		};
+
+		this.bot.on('guildMemberRemove', this.tzHandleLeave.bind(this));
 	}
 	
 	command__tz(params, message) {
@@ -280,6 +282,10 @@ class TimezoneMixin extends BotBase {
 			// Save this!
 			return this.saveSetting(member, '-timezones', data, true);
 		});
+	}
+
+	tzHandleLeave(member) {
+		return this.manageTimezoneList(member);
 	}
 	
 	static LookupTimezone(place) {

@@ -360,6 +360,8 @@ module.exports = (BotBase) => {
 			
 			this.bot.on('message', this.walkthrough.bind(this));
 			this.walkthroughTracker = {};
+
+			this.bot.on('guildMemberRemove', this.characterHandleLeave.bind(this));
 		}
 
 		command__character(params, message) {
@@ -717,6 +719,11 @@ module.exports = (BotBase) => {
 					return message.channel.send(`Goodbye ${name}! It was nice knowing you.`);
 				});
 			});
+		}
+
+		characterHandleLeave(member) {
+			// getCharacterList removes non-existent members
+			return this.saveCharacterList(member, this.getCharacterList(member));
 		}
 		
 		characterStat(params, message) {

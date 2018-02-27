@@ -25,6 +25,7 @@ module.exports = (BotBase) =>
 				return this.getServerSettings(message);
 			})
 			.then((settings) => {
+				console.log(settings);
 				settings.responses = settings.responses || [];
 				const marco = params._[0].toLowerCase();
 				const polo = params._[1];
