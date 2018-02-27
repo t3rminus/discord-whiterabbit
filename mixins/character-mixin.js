@@ -1,7 +1,7 @@
 'use strict';
 
 const Bluebird = require('bluebird'),
-	ParseCommand = require('minimist-string'),
+	YargsParser = require('yargs-parser'),
 	FuzzyMatching = require('fuzzy-matching'),
 	Misc = require('../lib/misc');
 
@@ -365,7 +365,7 @@ module.exports = (BotBase) => {
 		}
 
 		command__character(params, message) {
-			const parsedParams = ParseCommand(params);
+			const parsedParams = YargsParser(params);
 			const command = parsedParams._.shift();
 			switch(command) {
 				case 'help':
