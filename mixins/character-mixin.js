@@ -1,7 +1,7 @@
 'use strict';
 
 const Bluebird = require('bluebird'),
-	ParseCommand = require('minimist-string'),
+	YargsParser = require('yargs-parser'),
 	FuzzyMatching = require('fuzzy-matching'),
 	Misc = require('../lib/misc');
 
@@ -360,10 +360,12 @@ module.exports = (BotBase) => {
 			
 			this.bot.on('message', this.walkthrough.bind(this));
 			this.walkthroughTracker = {};
+
+			this.bot.on('guildMemberRemove', this.characterHandleLeave.bind(this));
 		}
 
 		command__character(params, message) {
-			const parsedParams = ParseCommand(params);
+			const parsedParams = YargsParser(params);
 			const command = parsedParams._.shift();
 			switch(command) {
 				case 'help':
@@ -717,6 +719,11 @@ module.exports = (BotBase) => {
 					return message.channel.send(`Goodbye ${name}! It was nice knowing you.`);
 				});
 			});
+		}
+
+		characterHandleLeave(member) {
+			// getCharacterList removes non-existent members
+			return this.saveCharacterList(member, this.getCharacterList(member));
 		}
 		
 		characterStat(params, message) {

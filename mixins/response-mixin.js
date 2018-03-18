@@ -19,7 +19,7 @@ module.exports = (BotBase) =>
 		command__response(params, message) {
 			return this.isAdmin(message).then(() => {
 				if(params._.length !== 2) {
-					return this.fail(message);
+					throw new Error('Unknown number of parameters');
 				}
 				
 				return this.getServerSettings(message);
