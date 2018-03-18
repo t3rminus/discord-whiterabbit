@@ -5,27 +5,29 @@ module.exports = (BotBase) =>
 		constructor() {
 			super();
 			
-			this.bot.on('messageDelete', this.handleDelete.bind(this));
-			this.bot.on('messageDeleteBulk', this.handleDelete.bind(this));
+			if(this.bot) {
+				this.bot.on('messageDelete', this.handleDelete.bind(this));
+				this.bot.on('messageDeleteBulk', this.handleDelete.bind(this));
+			}
 		}
 		
 		handleDelete(message) {
-			let aMessage;
+			let singleMessage;
 			if(message instanceof Map) {
-				aMessage = message.first();
+				singleMessage = message.first();
 			} else {
-				aMessage = message;
+				singleMessage = message;
 			}
-			if(!aMessage) {
+			if(!singleMessage) {
 				return;
 			}
 			
-			const guild = aMessage.guild;
+			const guild = singleMessage.guild;
 			if(!guild.available) {
 				return;
 			}
 			
-			return this.getServerSettings(aMessage)
+			return this.getServerSettings(singleMessage)
 			.then(serverSettings => {
 				let messages;
 				if(message instanceof Map) {

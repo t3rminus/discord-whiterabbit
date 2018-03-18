@@ -18,6 +18,28 @@ class NoResultError extends Error {
 	}
 }
 
+const BOT_TIMEZONE = [
+	'is behind schedule.',
+	'is happening presently.',
+	'flows slightly slower than usual.',
+	'runs faster than you might expect.',
+	'might be getting away from them.',
+	'is exactly π minutes later than now.',
+	'is half-past teatime.',
+	'keeps on slippin\'... slippin\'...slippin\'.',
+	'couldn\'t be the slightest bit less important.',
+	'... Oh goodness! I\'m late!',
+	'is difficult to measure.',
+	'is being enjoyed to the fullest.',
+	'is not being wasted.',
+	'is a sight to behold.',
+	'is purple.',
+	'smells like cherries.',
+	'is like a big ball of wibbly-wobbly, timey-wimey... stuff.',
+	'is 27:82 -∞',
+	'is bigger than a breadbox.'
+];
+
 module.exports = (BotBase) =>
 class TimezoneMixin extends BotBase {
 	constructor() {
@@ -114,7 +136,14 @@ class TimezoneMixin extends BotBase {
 				
 				// For each member, figure out who they are and look up their info
 				return Bluebird.map(members, (member) => {
-					if(member && member.id) {
+					if(member && member.id === this.bot.user.id) {
+						const userData = {
+							user: member.id,
+							timezone: 'Europe/Wonderland',
+							isBot: true
+						};
+						return TimezoneMixin.whenIsMessage(member, userData, myData);
+					} else if(member && member.id) {
 						// Get the user's info
 						return this.getSetting(member)
 						.then((userData) => {
@@ -219,7 +248,10 @@ class TimezoneMixin extends BotBase {
 	}
 	
 	static whenIsMessage(user, theirData, myData) {
-		if (myData && myData.user !== theirData.user) {
+		if(theirData.isBot) {
+			const time = BOT_TIMEZONE[Math.floor(Math.random() * BOT_TIMEZONE.length)];
+			return `**${user.displayName}:** Their local time ${time}`;
+		} else if (myData && myData.user !== theirData.user) {
 			let result = `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`;
 			const diff = TimezoneMixin.getTimezoneDifference(theirData.timezone, myData.timezone);
 			
@@ -232,7 +264,7 @@ class TimezoneMixin extends BotBase {
 		} else if (myData && myData.user === theirData.user) {
 			return `**${user.displayName}:** Your local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`
 		} else {
-			return `**` + user.displayName + `:** Their local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`;
+			return `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`;
 		}
 	}
 	
