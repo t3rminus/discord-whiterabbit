@@ -4,7 +4,8 @@
   "description": "Bot for Discord to coordinate people in different timezones",
   "main": "main.js",
   "engines": {
-    "node": "^8.4.0"
+    "node": "^8.4.0",
+    "npm": "^5.7.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
