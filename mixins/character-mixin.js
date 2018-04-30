@@ -385,7 +385,12 @@ module.exports = (BotBase) => {
 				case 'picture':
 				case 'photo':
 				case 'image':
-					return this.characterPic(params, message);
+					return this.characterPic(params, message, false);
+				case 'thumbnail':
+				case 'thumb':
+				case 'portrait':
+				case 'mugshot':
+					return this.characterPic(params, message, true);
 				case 'sheet':
 					return this.characterSheet(params.replace(command,''), message);
 				default:
@@ -406,7 +411,8 @@ module.exports = (BotBase) => {
 						{ name: 'delete', args: ['exact name'], helpText: 'Delete a character. Be careful!'},
 						{ name: 'stat', args: ['stat name','(value)'], helpText: 'Set or display a character stat. Depends on template (if used).'},
 						{ name: 'info', args: ['info name','(value)'], helpText: 'Set or display a character’s info. Generally free-form, but try `name`,`description`,`race`, or `class`. Delete character info by writing `delete` as a value.'},
-						{ name: 'image', args: ['inserted picture'], helpText: 'Set a character’s picture. When uploading a file, use this as a comment'},
+						{ name: 'image', args: ['inserted picture'], helpText: 'Set a character’s picture. Simply upload a file and use this command as a comment'},
+						{ name: 'portrait', args: ['inserted picture'], helpText: 'Set a character’s portrait picture. Simply upload a file and use this command as a comment'},
 						{ name: 'sheet', args: ['(name)'], helpText: 'Displays a character sheet for a character. Defaults to your current character.'}
 					];
 
@@ -1013,7 +1019,11 @@ module.exports = (BotBase) => {
 					results = results.filter(r => r);
 
 					// Join all results with newlines, and print the message
-					message.channel.send(results.join('\n\n'));
+					if(!results.length) {
+						return message.channel.send('Nobody has told me about their characters yet!');
+					} else {
+						return message.channel.send(results.join('\n\n'));
+					}
 				});
 		}
 
@@ -1090,8 +1100,14 @@ module.exports = (BotBase) => {
 			};
 
 			if(character.image) {
-				replyObj.thumbnail = {
+				replyObj.image = {
 					url: character.image
+				}
+			}
+
+			if(character.thumbnail) {
+				replyObj.thumbnail = {
+					url: character.thumbnail
 				}
 			}
 
@@ -1177,11 +1193,12 @@ module.exports = (BotBase) => {
 			return message.channel.send({ embed: replyEmbed });
 		}
 
-		characterPic(params, message) {
+		characterPic(params, message, thumb) {
+			const property = thumb ? 'thumbnail' : 'image';
 			let image;
 			if(message.attachments && message.attachments.size) {
 				image = message.attachments.first();
-			} else if(/^pic\s+delete/.test(params)) {
+			} else if(/\s+delete$/.test(params)) {
 				image = null;
 			} else {
 				return this.fail(message);
@@ -1198,15 +1215,19 @@ module.exports = (BotBase) => {
 				const character = userSettings.characters.find((c) => c.name === userSettings.currentCharacter);
 
 				if(image) {
-					character.image = image.url;
+					character[property] = image.url;
 				} else {
-					delete character.image;
+					delete character[property];
 				}
 
 				return this.saveSetting(message.member, true, userSettings, true)
 				.then(() => {
-					if(character.image) {
-						return message.channel.send(`Wow! Now I know what ${character.name} looks like.`);
+					if(character[property]) {
+						if(thumb) {
+							return message.channel.send(`What a great close-up of ${character.name}!`);
+						} else {
+							return message.channel.send(`Wow! Now I know what ${character.name} looks like.`);
+						}
 					} else {
 						return message.channel.send(`Ok. I’ll get rid of that picture of ${character.name}.`);
 					}
