@@ -48,7 +48,7 @@ const CharacterTemplates = {
 					if(level === null) {
 						return null;
 					}
-					
+
 					if(level > 16) {
 						return 6;
 					} else if(level > 12) {
@@ -145,7 +145,7 @@ const walkthroughSteps = [
 					throw new Error(`That’s very similar to someone else’s ` +
 						`character "${result.character}"… Try something else to avoid confusion.`);
 				}
-				
+
 				track.character.name = message.content;
 				return message.author.sendMessage(`Okay! Their name is ${name}!`)
 					.then(() => true);
@@ -190,7 +190,7 @@ const walkthroughSteps = [
 				} else  {
 					throw new Error('Whoops! There didn’t seem to be an picture with that message.');
 				}
-				
+
 				track.character.image = image.url;
 				return message.author.sendMessage(`Wow! Now I know what ${track.character.name} looks like.`)
 					.then(() => true);
@@ -230,12 +230,12 @@ const walkthroughSteps = [
 		process: function(track, message) {
 			const info = track.nextInfo;
 			delete track.nextInfo;
-			
+
 			if(isSkip(message)) {
 				return message.author.sendMessage(`Got it! Next!`)
 					.then(() => 'stat');
 			}
-			
+
 			track.character[info] = message.content;
 			return message.author.sendMessage(`Good! Noted.`)
 				.then(() => 'info');
@@ -265,14 +265,14 @@ const walkthroughSteps = [
 				return message.author.sendMessage(`Okay. You can set that later.`)
 					.then(() => 'stat');
 			}
-			
+
 			const game = CharacterTemplates[track.character.template];
 			if(!track.character.stats) {
 				track.character.stats = {};
 			}
-			
+
 			track.character.stats[track.curStat] = message.content;
-			
+
 			return Bluebird.try(() => {
 				if(game.stats[track.curStat].calc) {
 					let calcVal = game.stats[track.curStat].calc(message.content);
@@ -312,7 +312,7 @@ const walkthroughSteps = [
 					throw new Error(`That’s very similar to someone else’s ` +
 						`character "${result.character}"… Try something else to avoid confusion.`);
 				}
-				
+
 				track.character.name = message.content;
 				return message.author.sendMessage(`Nice to meet you, ${name}!`)
 				.then(() => 99); // End
@@ -325,7 +325,7 @@ module.exports = (BotBase) => {
 	class CharacterMixin extends BotBase {
 		constructor() {
 			super();
-			
+
 			this.commands['character'] = {
 				helpText: 'Character management. Try typing `{prefix}character help`.',
 				args: ['commands'],
@@ -333,7 +333,7 @@ module.exports = (BotBase) => {
 				parseParams: false,
 				sort: 9990
 			};
-			
+
 			this.commands['whois'] = {
 				helpText: 'Look up the characters a player is playing',
 				args: ['username'],
@@ -341,7 +341,7 @@ module.exports = (BotBase) => {
 				parseParams: false,
 				sort: 9991
 			};
-			
+
 			this.commands['whoplays'] = {
 				helpText: 'Look up the player of a certain character',
 				args: ['character name'],
@@ -349,7 +349,7 @@ module.exports = (BotBase) => {
 				parseParams: false,
 				sort: 9992
 			};
-			
+
 			this.commands['playas'] = {
 				helpText: 'Change your current character',
 				args: ['character name'],
@@ -357,7 +357,7 @@ module.exports = (BotBase) => {
 				parseParams: false,
 				sort: 9993
 			};
-			
+
 			this.bot.on('message', this.walkthrough.bind(this));
 			this.walkthroughTracker = {};
 
@@ -392,14 +392,14 @@ module.exports = (BotBase) => {
 					return this.fail(message);
 			}
 		}
-		
+
 		characterHelp(message) {
 			return this.getServerSettings(message)
 				.then(serverSettings => {
 					let reply = 'Character commands.\n\n';
-					
+
 					const templates = Object.keys(CharacterTemplates).map(t => `\`${t}\``).join(',');
-					
+
 					const commands = [
 						{ name: 'help', helpText: 'Get help for character commands.'},
 						{ name: 'create', args: ['name','(--type TEMPLATE)'], helpText: 'Create a character. Current templates are ' + templates},
@@ -409,26 +409,26 @@ module.exports = (BotBase) => {
 						{ name: 'image', args: ['inserted picture'], helpText: 'Set a character’s picture. When uploading a file, use this as a comment'},
 						{ name: 'sheet', args: ['(name)'], helpText: 'Displays a character sheet for a character. Defaults to your current character.'}
 					];
-					
+
 					commands.forEach(command => {
 							let name = command.ignorePrefix ? `?character` : `${serverSettings.prefix}character`;
-							
+
 							reply += `• \`${name}\` \`${command.name}\` `;
-							
+
 							if(command.args) {
 								reply += command.args.map(a => `\`${a}\``).join(' ');
 							}
-							
+
 							if(command.helpText) {
 								const helpText = command.helpText.replace(/{prefix}/g, serverSettings.prefix);
 								reply += `\n\t\t${helpText}\n⁣\n`;
 							}
 					});
-					
+
 					return message.channel.send(reply);
 				});
 		}
-		
+
 		startWalkthrough(message) {
 			const track = (this.walkthroughTracker[message.author.id] = {
 				user: message.author.id,
@@ -442,7 +442,7 @@ module.exports = (BotBase) => {
 				completedSteps: [],
 				ready: true
 			});
-			
+
 			return Bluebird.try(() => {
 				return message.author.sendMessage(`Hello! You wanted to set up a character on the ${message.guild.name} server? ` +
 					`What fun! I’ll walk you through the process. If you want to cancel at anytime, just ` +
@@ -458,25 +458,25 @@ module.exports = (BotBase) => {
 				});
 			});
 		}
-		
-		
+
+
 		walkthrough(message) {
 			if(message.channel.type === 'dm' && message.author.id !== this.bot.user.id) {
 				if(!this.walkthroughTracker[message.author.id] || !this.walkthroughTracker[message.author.id].ready) {
 					return;
 				}
-				
+
 				const track = this.walkthroughTracker[message.author.id];
 				if(message.content === 'ABORT') {
 					clearTimeout(track.timeout);
 					delete this.walkthroughTracker[message.author.id];
 					return message.author.sendMessage(`Abort! Sorry things didn’t work out.`);
 				}
-				
+
 				return this.walkthroughStep(track, message);
 			}
 		}
-		
+
 		walkthroughStep(track, message) {
 			let step = walkthroughSteps[track.step];
 			track.ready = false;
@@ -488,7 +488,7 @@ module.exports = (BotBase) => {
 			.then((processResult) => {
 				if(processResult) {
 					track.completedSteps.push(track.step);
-					
+
 					if(processResult === true) {
 						track.step++;
 					} else {
@@ -503,12 +503,12 @@ module.exports = (BotBase) => {
 							track.step = processResult;
 						}
 					}
-					
+
 					const statNext = walkthroughSteps[track.step] && walkthroughSteps[track.step].step === 'stat';
 					const haveStats = track.stats && track.stats.length;
 					if(track.step < walkthroughSteps.length && (!statNext || haveStats)) {
 						step = walkthroughSteps[track.step];
-						
+
 						const open = step.repeat && track.completedSteps.indexOf(track.step) > -1 ? step.repeat : step.open;
 						return Bluebird.resolve(open(track, message, this))
 						.then((text) => {
@@ -573,7 +573,7 @@ module.exports = (BotBase) => {
 					});
 			});
 		}
-		
+
 		saveCharacter(character, message) {
 			return this.findCharacter(character.name, message, CharacterNameDistance)
 			.then(result => {
@@ -582,18 +582,18 @@ module.exports = (BotBase) => {
 					err.result = result;
 					throw err;
 				}
-				
+
 				return this.getSetting(message.member, true)
 				.then((userSettings) => {
 					userSettings = userSettings || {};
-					
+
 					// Setup the storage, if they're not set
 					userSettings.characters = userSettings.characters || [];
-					
+
 					// Add the character.
 					userSettings.currentCharacter = character.name;
 					userSettings.characters.push(character);
-					
+
 					// Update the global list
 					return this.getCharacterList(message.member)
 					.then(characterList => {
@@ -610,12 +610,12 @@ module.exports = (BotBase) => {
 				});
 			});
 		}
-		
+
 		newCharacter(params, message) {
 			const name = params._.join(' ');
 			const character = { name };
 			character.template = (params && params.type) || null;
-			
+
 			return this.saveCharacter(character, message)
 			.then((character) => {
 				// Character created!
@@ -629,14 +629,14 @@ module.exports = (BotBase) => {
 					`character "${err.result.character}"… Try something else to avoid confusion.`);
 			});
 		}
-		
+
 		findCharacter(name, message, distance) {
 			return this.getCharacterList(message.member)
 			.then(serverCharacters => {
 				// Fuzzy match the name, to make sure we're not naming characters too similarly
 				let chrNames = [];
 				let characters = {};
-				
+
 				Object.keys(serverCharacters).forEach((userId) => {
 					if(serverCharacters[userId] && serverCharacters[userId].length) {
 						serverCharacters[userId].forEach(character => {
@@ -650,10 +650,10 @@ module.exports = (BotBase) => {
 						});
 					}
 				});
-				
+
 				const fm = new FuzzyMatching(chrNames);
 				const result = fm.get(name, { min: distance });
-				
+
 				if(result.value) {
 					return characters[result.value];
 				} else {
@@ -661,7 +661,7 @@ module.exports = (BotBase) => {
 				}
 			});
 		}
-		
+
 		getCharacterList(member) {
 			// Load global character list
 			return this.getSetting(member, '-characters')
@@ -675,36 +675,36 @@ module.exports = (BotBase) => {
 						}
 					});
 				}
-				
+
 				return data;
 			});
 		}
-		
+
 		saveCharacterList(member, list) {
 			return this.saveSetting(member, '-characters', list, true);
 		}
-		
+
 		deleteCharacter(name, message) {
 			name = name.trim();
 			const safeName = name.replace(/[^a-zA-Z0-9'’]+/g,' ');
 			return this.getSetting(message.member, true)
 			.then((userSettings) => {
 				userSettings.characters = userSettings.characters || [];
-				
+
 				const character = userSettings.characters.find(c => c.name === name);
-				
+
 				if(!character) {
 					return message.channel.send(`I don’t believe I’ve met ${safeName}…`);
 				}
-				
+
 				const idx = userSettings.characters.findIndex((c) => c.name === character.name);
 				userSettings.characters.splice(idx, 1);
-				
+
 				// If they're currently that character. Forget about it.
 				if(userSettings.currentCharacter === character.name) {
 					delete userSettings.currentCharacter;
 				}
-				
+
 				// Update the global list
 				return this.getCharacterList(message.member)
 				.then(characterList => {
@@ -723,30 +723,33 @@ module.exports = (BotBase) => {
 
 		characterHandleLeave(member) {
 			// getCharacterList removes non-existent members
-			return this.saveCharacterList(member, this.getCharacterList(member));
+			return this.getCharacterList(member)
+				.then((characterList) => {
+					return this.saveCharacterList(member, characterList);
+				});
 		}
-		
+
 		characterStat(params, message) {
 			const stat = params._[0].trim();
 			let value = params._[1];
-			
+
 			if(value && value.trim) {
 				value = value.trim();
 			}
-			
+
 			return this.getSetting(message.member, true)
 			.then((userSettings) => {
 				userSettings.characters = userSettings.characters || [];
-				
+
 				if(!userSettings.currentCharacter) {
 					return message.channel.send(`You’re not currently playing a character. Please create or select a character first.`);
 				}
-				
+
 				const character = userSettings.characters.find((c) => c.name === userSettings.currentCharacter);
 				const template = CharacterTemplates[character.template];
-				
+
 				character.stats = character.stats || {};
-				
+
 				// Is this a templated character
 				if(template) {
 					// Did they pass a value to update?
@@ -800,7 +803,7 @@ module.exports = (BotBase) => {
 						} else {
 							character.stats[stat] = value;
 						}
-						
+
 						return this.saveSetting(message.member, true, userSettings, true)
 						.then(() => {
 							if(character.stats[stat]) {
@@ -819,7 +822,7 @@ module.exports = (BotBase) => {
 				}
 			});
 		}
-		
+
 		characterInfo(params, message) {
 			const parsedParams = /^(\w+)\s*([\s\S]*)$/.exec(params.trim());
 			if(!parsedParams || !parsedParams[1]) {
@@ -827,21 +830,21 @@ module.exports = (BotBase) => {
 			}
 			const info = parsedParams[1].toLowerCase();
 			const value = parsedParams[2].trim();
-			
+
 			if(['stats','image'].indexOf(info) >= 0) {
 				return this.fail(message);
 			}
-			
+
 			return this.getSetting(message.member, true)
 			.then((userSettings) => {
 				userSettings.characters = userSettings.characters || [];
-				
+
 				if(!userSettings.currentCharacter) {
 					return message.channel.send(`You’re not currently playing a character. Please create or select a character first.`);
 				}
-				
+
 				const character = userSettings.characters.find((c) => c.name === userSettings.currentCharacter);
-				
+
 				// Did they pass a value?
 				if(value) {
 					if(value === 'delete' && info !== 'name') {
@@ -849,11 +852,11 @@ module.exports = (BotBase) => {
 					} else {
 						character[info] = value;
 					}
-					
+
 					let result = Bluebird.resolve();
 					if(info === 'name') {
 						userSettings.currentCharacter = value;
-						
+
 						result = result.then(() => {
 							// Update the global list
 							return this.getCharacterList(message.member)
@@ -863,7 +866,7 @@ module.exports = (BotBase) => {
 							});
 						});
 					}
-					
+
 					return result.then(() => {
 						return this.saveSetting(message.member, true, userSettings, true)
 						.then(() => {
@@ -889,14 +892,14 @@ module.exports = (BotBase) => {
 				}
 			});
 		}
-		
+
 		command__playas(params, message) {
 			const name = params.trim();
-			
+
 			return this.getSetting(message.member, true)
 			.then((userSettings) => {
 				userSettings.characters = userSettings.characters || [];
-				
+
 				if(name === '') {
 					delete userSettings.currentCharacter;
 					return this.saveSetting(message.member, true, userSettings, true)
@@ -904,43 +907,43 @@ module.exports = (BotBase) => {
 						return message.channel.send(`Ok. You're not currently playing as anyone.`);
 					});
 				}
-				
+
 				const chrNames = userSettings.characters.map(c => c.name);
 				const fm = new FuzzyMatching(chrNames);
 				const result = fm.get(name);
-				
+
 				if(!result.value && name !== '') {
 					return message.channel.send(`I don’t believe I’ve met ${name}…`);
 				}
-				
+
 				if(name !== '') {
 					userSettings.currentCharacter = result.value;
 				}
-				
+
 				return this.saveSetting(message.member, true, userSettings, true)
 				.then(() => {
 					return message.channel.send(`Ok. You're currently ${result.value}.`);
 				});
 			});
 		}
-		
+
 		command__whois(params, message) {
 			params = params.trim();
-			
+
 			if(params.toLowerCase() === 'all' || params.toLowerCase() === 'everyone') {
 				return this.whoisAll(message);
 			}
-			
+
 			params = params.split(/(, ?| |; ?)/);
 			params = params.filter(p => p.length && !/^\s+$/.test(p) && !/^(, ?| |; ?)$/.test(p));
-			
+
 			// Map all the searched names to users
 			return this.findUsers(params, message)
 			.then((members) => {
 				if(!members) {
 					return this.fail(message);
 				}
-				
+
 				// For each member, figure out who they are and look up their info
 				return Bluebird.map(members, (member) => {
 					if(member && member.id) {
@@ -949,7 +952,7 @@ module.exports = (BotBase) => {
 							if(!userData) {
 								throw new Error();
 							}
-							
+
 							let result = '';
 							if(member.id === message.author.id) {
 								if(userData.currentCharacter) {
@@ -964,7 +967,7 @@ module.exports = (BotBase) => {
 									result += `${member.displayName} is not currently playing as anyone.`;
 								}
 							}
-							
+
 							const characterNames = (userData.characters || []).map(c => c.name)
 								.filter(c => c !== userData.currentCharacter);
 							if(characterNames.length) {
@@ -974,7 +977,7 @@ module.exports = (BotBase) => {
 									result += `\nOther characters played by ${member.displayName}: ${characterNames.join(', ')}.`;
 								}
 							}
-							
+
 							return result;
 						})
 						.catch(() => {
@@ -990,7 +993,7 @@ module.exports = (BotBase) => {
 				});
 			});
 		}
-		
+
 		whoisAll(message) {
 			return this.getCharacterList(message.member)
 				.then((list) => {
@@ -1008,15 +1011,15 @@ module.exports = (BotBase) => {
 				})
 				.then((results) => {
 					results = results.filter(r => r);
-					
+
 					// Join all results with newlines, and print the message
 					message.channel.send(results.join('\n\n'));
 				});
 		}
-		
+
 		command__whoplays(params, message) {
 			const name = params.trim();
-			
+
 			return this.findCharacter(name, message)
 				.then(result => {
 					if(result) {
@@ -1026,7 +1029,7 @@ module.exports = (BotBase) => {
 					}
 				});
 		}
-		
+
 		characterSheet(name, message) {
 			return Bluebird.try(() => {
 				if(name) {
@@ -1055,7 +1058,7 @@ module.exports = (BotBase) => {
 					// Didn't try to search, but current user has no characters
 					return message.channel.send(`It doesn’t seem like you have a character to display.`);
 				}
-				
+
 				// Get the member from the userId
 				const member = message.guild.members.get(foundCharacter.userId);
 				if(!member) {
@@ -1078,20 +1081,20 @@ module.exports = (BotBase) => {
 					});
 			});
 		}
-		
+
 		renderSheet(character, member, message) {
 			const replyObj = {
 				title: (character.title ? character.title + ' ' : '') + character.name,
 				description: character.description || 'Not much is known about this mysterious character…',
 				fields: []
 			};
-			
+
 			if(character.image) {
 				replyObj.thumbnail = {
 					url: character.image
 				}
 			}
-			
+
 			if(character.template && CharacterTemplates[character.template]) {
 				replyObj.footer = {
 					text: `A ${CharacterTemplates[character.template].game} character - Played by ${member.displayName}`
@@ -1101,7 +1104,7 @@ module.exports = (BotBase) => {
 					text: `A free-form character - Played by ${member.displayName}`
 				};
 			}
-			
+
 			// Set this here now
 			if(character.template && CharacterTemplates[character.template] &&
 				CharacterTemplates[character.template].derivedStats &&
@@ -1112,7 +1115,7 @@ module.exports = (BotBase) => {
 					character.level = level;
 				}
 			}
-			
+
 			if(character.race) {
 				replyObj.fields.push({ name: "Race", value: character.race });
 			}
@@ -1128,8 +1131,8 @@ module.exports = (BotBase) => {
 			if(character.occupation || character.job) {
 				replyObj.fields.push({ name: "Occupation", value: character.occupation || character.job });
 			}
-			
-			
+
+
 			if(character.template && CharacterTemplates[character.template]) {
 				const template = CharacterTemplates[character.template];
 				const statKeys = Object.keys(template.stats);
@@ -1161,19 +1164,19 @@ module.exports = (BotBase) => {
 					replyObj.fields.push({ name: stat, value: character.stats[stat], inline: true });
 				});
 			}
-			
+
 			const fieldBlacklist = ['title','name','race','description','image','stats','level',
 									'class','occupation','job','template'];
 			const infoFields = Object.keys(character).filter(i => fieldBlacklist.indexOf(i) < 0);
 			infoFields.forEach(info => {
 				replyObj.fields.push({ name: capitalize(info), value: character[info] });
 			});
-			
+
 			const replyEmbed = new BotBase.Discord.RichEmbed(replyObj);
-			
+
 			return message.channel.send({ embed: replyEmbed });
 		}
-		
+
 		characterPic(params, message) {
 			let image;
 			if(message.attachments && message.attachments.size) {
@@ -1183,23 +1186,23 @@ module.exports = (BotBase) => {
 			} else {
 				return this.fail(message);
 			}
-			
+
 			return this.getSetting(message.member, true)
 			.then((userSettings) => {
 				userSettings.characters = userSettings.characters || [];
-				
+
 				if(!userSettings.currentCharacter) {
 					return message.channel.send(`You’re not currently playing a character. Please create or select a character first.`);
 				}
-				
+
 				const character = userSettings.characters.find((c) => c.name === userSettings.currentCharacter);
-				
+
 				if(image) {
 					character.image = image.url;
 				} else {
 					delete character.image;
 				}
-				
+
 				return this.saveSetting(message.member, true, userSettings, true)
 				.then(() => {
 					if(character.image) {
@@ -1210,28 +1213,28 @@ module.exports = (BotBase) => {
 				});
 			});
 		}
-		
+
 		roll__getStat(stat, message) {
 			stat = ('' + stat).trim().toLowerCase();
-			
+
 			return this.getSetting(message.member, true)
 			.then((userSettings) => {
 				userSettings.characters = userSettings.characters || [];
-				
+
 				if (!userSettings.currentCharacter) {
 					return null;
 				}
-				
+
 				const character = userSettings.characters.find((c) => c.name === userSettings.currentCharacter);
 				if(!character) {
 					return null;
 				}
-				
+
 				let template;
 				if(character.template && CharacterTemplates[character.template]) {
 					template = CharacterTemplates[character.template];
 				}
-				
+
 				// TODO: clean this up
 				if(template && template.stats && template.stats[stat] && template.stats[stat].calc && character.stats[stat]) {
 					return template.stats[stat].calc(character.stats[stat]);
@@ -1242,7 +1245,7 @@ module.exports = (BotBase) => {
 						const statVal = parseInt(character.stats[stat]);
 						return Number.isNaN(statVal) ? null : statVal;
 					}
-					
+
 					if(template && template.derivedStats) {
 						const statKeys = Object.keys(template.derivedStats);
 						const match = statKeys.find(fs => fs.alias &&
@@ -1251,16 +1254,16 @@ module.exports = (BotBase) => {
 							return template.derivedStats[match].calc(character);
 						}
 					}
-					
+
 					return null;
 				}
 			});
 		}
 	}
-	
-	
-	
+
+
+
 	CharacterMixin.ExistingCharacter = ExistingCharacter;
-	
+
 	return CharacterMixin;
 };
