@@ -9,7 +9,7 @@ const butt = Jimp.read('images/cat_butt.png'),
 
 const boiHeight = 60;
 
-const MEOW_API = 'https://aws.random.cat/meow';
+const MEOW_API = 'http://thecatapi.com/api/images/get';
 const WOOF_API = 'https://random.dog/woof';
 
 module.exports = (BotBase) =>
@@ -67,9 +67,25 @@ module.exports = (BotBase) =>
 		}
 
 		command__meow(params, message) {
-			return pr.get(MEOW_API)
-				.then(JSON.parse)
-				.then(({file}) => {
+			let result;
+			if(process.env.CAT_API_KEY) {
+				if(MEOW_API.indexOf('?') >= 0) {
+					result = pr.get(`${MEOW_API}&api_key=${process.env.CAT_API_KEY}`, { followRedirect: false });
+				} else {
+					result = pr.get(`${MEOW_API}?api_key=${process.env.CAT_API_KEY}`, { followRedirect: false });
+				}
+			} else {
+				result = pr.get(MEOW_API, { followRedirect: false });
+			}
+
+			return result
+				.catch(err => {
+					if(err.statusCode === 302 && err.response && err.response.headers && err.response.headers.location) {
+						return err.response.headers.location;
+					}
+					throw err;
+				})
+				.then((file) => {
 					return message.channel.send(new BotBase.Discord.Attachment(file, file));
 				});
 		}

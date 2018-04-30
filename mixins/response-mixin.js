@@ -5,23 +5,23 @@ module.exports = (BotBase) =>
 	class ResponderMixin extends BotBase {
 		constructor() {
 			super();
-			
+
 			this.commands['response'] = {
 				helpText: 'When you say __marco__, I say __polo__. Enclose marco/polo in `"` quotes. Use `"delete"` for polo to remove a response. Use --fuzzy to roughly match, and --partial to respond if it’s anywhere in a message.',
 				args: ['"marco"','"polo"','(--fuzzy)','(--partial)'],
 				method: 'command__response',
 				adminOnly: true
 			};
-			
+
 			this.addHandler(this.msg_response);
 		}
-		
+
 		command__response(params, message) {
 			return this.isAdmin(message).then(() => {
 				if(params._.length !== 2) {
 					throw new Error('Unknown number of parameters');
 				}
-				
+
 				return this.getServerSettings(message);
 			})
 			.then((settings) => {
@@ -32,23 +32,26 @@ module.exports = (BotBase) =>
 					const del = settings.responses.findIndex((i) => i.marco === marco);
 					if(del > -1) {
 						settings.responses.splice(del, 1);
-						return message.channel.send(`I’ve forgotten the response to "${marco}"`);
+						return this.saveServerSettings(message, settings, true)
+							.then(() => {
+								return message.channel.send(`I’ve forgotten the response to "${marco}"`);
+							});
 					} else {
 						return message.channel.send(`I don’t have a response for "${marco}"`);
 					}
 				}
-				
+
 				const existing = ResponderMixin.findResponse(settings, marco);
 				if(existing) {
 					return message.channel.send(`I'm already responding to "${marco}": "${existing.polo}"`);
 				}
-				
+
 				settings.responses.push({
 					marco, polo,
 					fuzzy: params['fuzzy'],
 					partial: params['partial']
 				});
-				
+
 				return this.saveServerSettings(message, settings, true)
 					.then(() => {
 						if(params['fuzzy']) {
@@ -61,7 +64,7 @@ module.exports = (BotBase) =>
 					});
 			});
 		}
-		
+
 		msg_response(message) {
 			if(message.member && message.member.id !== this.bot.user.id) {
 				this.getServerSettings(message)
@@ -76,7 +79,7 @@ module.exports = (BotBase) =>
 
 			return false;
 		}
-		
+
 		static findResponseIndex(settings, find) {
 			let index = -1;
 			if(settings.responses && settings.responses.length) {
@@ -84,7 +87,7 @@ module.exports = (BotBase) =>
 					if(r.fuzzy) {
 						const fm = new FuzzyMatching([r.marco]);
 						const result = fm.get(find, { min: 0.8 });
-						
+
 						if(result.value) {
 							return true;
 						}
@@ -101,7 +104,7 @@ module.exports = (BotBase) =>
 			}
 			return index;
 		}
-		
+
 		static findResponse(settings, find) {
 			if(settings.responses && settings.responses.length) {
 				const index = ResponderMixin.findResponseIndex(settings, find);
@@ -109,7 +112,7 @@ module.exports = (BotBase) =>
 					return settings.responses[index];
 				}
 			}
-			
+
 			return null;
 		}
 	};
