@@ -161,7 +161,7 @@ class TimezoneMixin extends BotBase {
 							return `**${member.displayName}:**  An error occurred for that user.`;
 						});
 					} else {
-						return `**${member}:** I couldn’t find that user.`;
+						return `**${BotBase.sanitize(member)}:** I couldn’t find that user.`;
 					}
 				})
 				.then((results) => {
@@ -326,7 +326,7 @@ class TimezoneMixin extends BotBase {
 		.then(JSON.parse)
 		.then((result) => {
 			if (result.status !== 'OK' || !result.results || !result.results[0]) {
-				throw new NoResultError('Could not find that city');
+				throw new NoResultError('Could not find that location');
 			}
 			
 			result = result.results[0];
@@ -341,7 +341,7 @@ class TimezoneMixin extends BotBase {
 			.then(JSON.parse)
 			.then((tzResult) => {
 				if (!tzResult || tzResult.status !== 'OK' || !tzResult.timeZoneId) {
-					throw new NoResultError('Could not find that city’s time zone');
+					throw new NoResultError('Could not find that location’s time zone');
 				}
 				
 				return {

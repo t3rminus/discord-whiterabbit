@@ -105,223 +105,224 @@ const capitalize = (string) => string.charAt(0).toUpperCase() + string.slice(1);
 const isSkip = (m,s) => ((m && m.content || `${m}`)).toLowerCase()
 	.trim().replace(/(^[^a-z]+|[^a-z]$)/gi,'') === (s || 'skip');
 
-const walkthroughSteps = [
-	{
-		// 0
-		step: 'template',
-		open: function() {
-			return `What kind of character did you want to create? I know about ` +
-			`\`${Object.keys(CharacterTemplates).join('`, `')}\`. If you ` +
-			`don’t want to use a template, just say \`none\`.`;
-		},
-		process: function(track, message) {
-			if(CharacterTemplates[message.content]) {
-				track.character.template = message.content;
-				track.stats = Object.keys(CharacterTemplates[message.content].stats);
-				return message.author.sendMessage(`Got it! I’ll keep track of their ` +
-					`${CharacterTemplates[message.content].game} stats.`).then(() => true);
-			} else if(isSkip(message) || isSkip(message, 'none')) {
-				return message.author.sendMessage(`Got it! I’ll keep track of their free form stats.`)
-					.then(() => true);
-			} else {
-				throw new Error(`Hmm... I’m not quite sure what you mean.`);
-			}
-		}
-	},
-	{
-		// 1
-		step: 'name',
-		open: function() {
-			return `What is your character’s name?`;
-		},
-		process: function(track, message, bot) {
-			if(isSkip(message)) {
-				throw new Error('Sorry, this is the one thing I can’t skip.');
-			}
-			const name = message.content;
-			return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
-			.then((result) => {
-				if(result) {
-					throw new Error(`That’s very similar to someone else’s ` +
-						`character "${result.character}"… Try something else to avoid confusion.`);
-				}
-
-				track.character.name = message.content;
-				return message.author.sendMessage(`Okay! Their name is ${name}!`)
-					.then(() => true);
-			});
-		},
-		repeat: function() {
-			return `Got any other ideas for a name for your character?`;
-		}
-	},
-	{
-		// 2
-		step: 'description',
-		open: function(track) {
-			return `Tell me about ${track.character.name}. What do they like? How do they dress? Where are they from? ` +
-				`Give me all the details of their life, so I know exactly who they are.`;
-		},
-		process: function(track, message) {
-			if(isSkip(message) || isSkip(message,'no')) {
-				return message.author.sendMessage(`Moving right along!`)
-					.then(() => true);
-			} else {
-				track.character.description = message.content;
-				return message.author.sendMessage(`Wonderful!`)
-					.then(() => true);
-			}
-		}
-	},
-	{
-		// 3
-		step: 'pic',
-		open: function() {
-			return `Do you have a picture of your character you’d like to use? If you do, please send it to me!`;
-		},
-		process: function(track, message) {
-			if(isSkip(message) || isSkip(message,'no')) {
-				return message.author.sendMessage(`No picture? That’s too bad, but you can always add it later.`)
-					.then(() => true);
-			} else {
-				let image;
-				if(message.attachments && message.attachments.size) {
-					image = message.attachments.first();
-				} else  {
-					throw new Error('Whoops! There didn’t seem to be an picture with that message.');
-				}
-
-				track.character.image = image.url;
-				return message.author.sendMessage(`Wow! Now I know what ${track.character.name} looks like.`)
-					.then(() => true);
-			}
-		}
-	},
-	{
-		// 4
-		step: 'info',
-		open: function() {
-			return `Now let’s work on some details. What information would you like to add? For instance,` +
-				` you can say something like \`job\`, \`class\`, or \`race\`.`;
-		},
-		repeat: function() {
-			return `Is there any other information you want to add? You can say \`job\`, \`class\`, or \`race\`, or ` +
-				`really anything at all! If you’ve entered everything you want, say \`done\`.`;
-		},
-		process: function(track, message) {
-			if(isSkip(message)) {
-				return message.author.sendMessage(`Okay! Skipping this for now.`)
-					.then(() => 'stat');
-			} else if(isSkip(message,'done')) {
-				return message.author.sendMessage(`Alright, done with info.`)
-					.then(() => 'stat');
-			} else {
-				track.nextInfo = message.content;
-				return true;
-			}
-		}
-	},
-	{
-		// 5
-		step: 'info_value',
-		open: function(track) {
-			return `Okay! What should I put down for ${track.nextInfo}?`;
-		},
-		process: function(track, message) {
-			const info = track.nextInfo;
-			delete track.nextInfo;
-
-			if(isSkip(message)) {
-				return message.author.sendMessage(`Got it! Next!`)
-					.then(() => 'stat');
-			}
-
-			track.character[info] = message.content;
-			return message.author.sendMessage(`Good! Noted.`)
-				.then(() => 'info');
-		}
-	},
-	{
-		// 6
-		step: 'stat',
-		open: function(track) {
-			track.curStat = track.stats[0];
-			const game = CharacterTemplates[track.character.template];
-			const statName = (game.stats[track.curStat].calc ? 'base ' : '')
-				+ game.stats[track.curStat].name.toLowerCase();
-			return `Ok! Since we’re setting up a ${game.game}` +
-				` character, I need some stats! What is their ${statName}?`;
-		},
-		repeat: function(track) {
-			track.curStat = track.stats[0];
-			const game = CharacterTemplates[track.character.template];
-			const statName = (game.stats[track.curStat].calc ? 'base ' : '')
-				+ game.stats[track.curStat].name.toLowerCase();
-			return `Okay, and what is their ${statName}?`;
-		},
-		process: function(track, message) {
-			if(isSkip(message)) {
-				track.stats.shift();
-				return message.author.sendMessage(`Okay. You can set that later.`)
-					.then(() => 'stat');
-			}
-
-			const game = CharacterTemplates[track.character.template];
-			if(!track.character.stats) {
-				track.character.stats = {};
-			}
-
-			track.character.stats[track.curStat] = message.content;
-
-			return Bluebird.try(() => {
-				if(game.stats[track.curStat].calc) {
-					let calcVal = game.stats[track.curStat].calc(message.content);
-					if(calcVal > 0) {
-						calcVal = `+${calcVal}`;
-					}
-					return message.author.sendMessage(`Okay. ${game.stats[track.curStat].name} is ${message.content}` +
-						` which is ${calcVal}`);
-				} else {
-					return message.author.sendMessage(`Okay. ${game.stats[track.curStat].name} is ${message.content}`);
-				}
-			})
-			.then(() => {
-				track.stats.shift();
-				if(track.stats.length) {
-					return 'stat';
-				} else {
-					return 99; // End
-				}
-			});
-		}
-	},
-	{
-		// 7
-		step: 'emergency_name',
-		open: function() {
-			return `Got any other ideas for a name for your character?`;
-		},
-		process: function(track, message, bot) {
-			if(isSkip(message)) {
-				throw new Error('Sorry, this is the one thing I can’t skip.');
-			}
-			const name = message.content;
-			return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
-			.then((result) => {
-				if(result) {
-					throw new Error(`That’s very similar to someone else’s ` +
-						`character "${result.character}"… Try something else to avoid confusion.`);
-				}
-
-				track.character.name = message.content;
-				return message.author.sendMessage(`Nice to meet you, ${name}!`)
-				.then(() => 99); // End
-			});
-		}
-	}
-];
-
 module.exports = (BotBase) => {
+	const walkthroughSteps = [
+		{
+			// 0
+			step: 'template',
+			open: function() {
+				return `What kind of character did you want to create? I know about ` +
+					`\`${Object.keys(CharacterTemplates).join('`, `')}\`. If you ` +
+					`don’t want to use a template, just say \`none\`.`;
+			},
+			process: function(track, message) {
+				if(CharacterTemplates[message.content]) {
+					track.character.template = message.content;
+					track.stats = Object.keys(CharacterTemplates[message.content].stats);
+					return message.author.sendMessage(`Got it! I’ll keep track of their ` +
+						`${CharacterTemplates[message.content].game} stats.`).then(() => true);
+				} else if(isSkip(message) || isSkip(message, 'none')) {
+					return message.author.sendMessage(`Got it! I’ll keep track of their free form stats.`)
+					.then(() => true);
+				} else {
+					throw new Error(`Hmm... I’m not quite sure what you mean.`);
+				}
+			}
+		},
+		{
+			// 1
+			step: 'name',
+			open: function() {
+				return `What is your character’s name?`;
+			},
+			process: function(track, message, bot) {
+				if(isSkip(message)) {
+					throw new Error('Sorry, this is the one thing I can’t skip.');
+				}
+				const name = BotBase.sanitize(message.content);
+				return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
+				.then((result) => {
+					if(result) {
+						throw new Error(`That’s very similar to someone else’s ` +
+							`character "${result.character}"… Try something else to avoid confusion.`);
+					}
+					
+					track.character.name = name;
+					return message.author.sendMessage(`Okay! Their name is ${name}!`)
+					.then(() => true);
+				});
+			},
+			repeat: function() {
+				return `Got any other ideas for a name for your character?`;
+			}
+		},
+		{
+			// 2
+			step: 'description',
+			open: function(track) {
+				return `Tell me about ${track.character.name}. What do they like? How do they dress? Where are they from? ` +
+					`Give me all the details of their life, so I know exactly who they are.`;
+			},
+			process: function(track, message) {
+				if(isSkip(message) || isSkip(message,'no')) {
+					return message.author.sendMessage(`Moving right along!`)
+					.then(() => true);
+				} else {
+					track.character.description = BotBase.sanitize(message.content);
+					return message.author.sendMessage(`Wonderful!`)
+					.then(() => true);
+				}
+			}
+		},
+		{
+			// 3
+			step: 'pic',
+			open: function() {
+				return `Do you have a picture of your character you’d like to use? If you do, please send it to me!`;
+			},
+			process: function(track, message) {
+				if(isSkip(message) || isSkip(message,'no')) {
+					return message.author.sendMessage(`No picture? That’s too bad, but you can always add it later.`)
+					.then(() => true);
+				} else {
+					let image;
+					if(message.attachments && message.attachments.size) {
+						image = message.attachments.first();
+					} else  {
+						throw new Error('Whoops! There didn’t seem to be an picture with that message.');
+					}
+					
+					track.character.image = image.url;
+					return message.author.sendMessage(`Wow! Now I know what ${track.character.name} looks like.`)
+					.then(() => true);
+				}
+			}
+		},
+		{
+			// 4
+			step: 'info',
+			open: function() {
+				return `Now let’s work on some details. What information would you like to add? For instance,` +
+					` you can say something like \`job\`, \`class\`, or \`race\`.`;
+			},
+			repeat: function() {
+				return `Is there any other information you want to add? You can say \`job\`, \`class\`, or \`race\`, or ` +
+					`really anything at all! If you’ve entered everything you want, say \`done\`.`;
+			},
+			process: function(track, message) {
+				if(isSkip(message)) {
+					return message.author.sendMessage(`Okay! Skipping this for now.`)
+					.then(() => 'stat');
+				} else if(isSkip(message,'done')) {
+					return message.author.sendMessage(`Alright, done with info.`)
+					.then(() => 'stat');
+				} else {
+					track.nextInfo = BotBase.sanitize(message.content);
+					return true;
+				}
+			}
+		},
+		{
+			// 5
+			step: 'info_value',
+			open: function(track) {
+				return `Okay! What should I put down for ${track.nextInfo}?`;
+			},
+			process: function(track, message) {
+				const info = track.nextInfo;
+				delete track.nextInfo;
+				
+				if(isSkip(message)) {
+					return message.author.sendMessage(`Got it! Next!`)
+					.then(() => 'stat');
+				}
+				
+				track.character[info] = BotBase.sanitize(message.content);
+				return message.author.sendMessage(`Good! Noted.`)
+				.then(() => 'info');
+			}
+		},
+		{
+			// 6
+			step: 'stat',
+			open: function(track) {
+				track.curStat = track.stats[0];
+				const game = CharacterTemplates[track.character.template];
+				const statName = (game.stats[track.curStat].calc ? 'base ' : '')
+					+ game.stats[track.curStat].name.toLowerCase();
+				return `Ok! Since we’re setting up a ${game.game}` +
+					` character, I need some stats! What is their ${statName}?`;
+			},
+			repeat: function(track) {
+				track.curStat = track.stats[0];
+				const game = CharacterTemplates[track.character.template];
+				const statName = (game.stats[track.curStat].calc ? 'base ' : '')
+					+ game.stats[track.curStat].name.toLowerCase();
+				return `Okay, and what is their ${statName}?`;
+			},
+			process: function(track, message) {
+				if(isSkip(message)) {
+					track.stats.shift();
+					return message.author.sendMessage(`Okay. You can set that later.`)
+					.then(() => 'stat');
+				}
+				
+				const game = CharacterTemplates[track.character.template];
+				if(!track.character.stats) {
+					track.character.stats = {};
+				}
+				
+				const stat = BotBase.sanitize(message.content);
+				track.character.stats[track.curStat] = stat;
+				
+				return Bluebird.try(() => {
+					if(game.stats[track.curStat].calc) {
+						let calcVal = game.stats[track.curStat].calc(stat);
+						if(calcVal > 0) {
+							calcVal = `+${calcVal}`;
+						}
+						return message.author.sendMessage(`Okay. ${game.stats[track.curStat].name} is ${stat}` +
+							` which is ${calcVal}`);
+					} else {
+						return message.author.sendMessage(`Okay. ${game.stats[track.curStat].name} is ${stat}`);
+					}
+				})
+				.then(() => {
+					track.stats.shift();
+					if(track.stats.length) {
+						return 'stat';
+					} else {
+						return 99; // End
+					}
+				});
+			}
+		},
+		{
+			// 7
+			step: 'emergency_name',
+			open: function() {
+				return `Got any other ideas for a name for your character?`;
+			},
+			process: function(track, message, bot) {
+				if(isSkip(message)) {
+					throw new Error('Sorry, this is the one thing I can’t skip.');
+				}
+				const name = BotBase.sanitize(message.input);
+				return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
+				.then((result) => {
+					if(result) {
+						throw new Error(`That’s very similar to someone else’s ` +
+							`character "${result.character}"… Try something else to avoid confusion.`);
+					}
+					
+					track.character.name = name;
+					return message.author.sendMessage(`Nice to meet you, ${name}!`)
+					.then(() => 99); // End
+				});
+			}
+		}
+	];
+	
 	class CharacterMixin extends BotBase {
 		constructor() {
 			super();
@@ -413,6 +414,7 @@ module.exports = (BotBase) => {
 						{ name: 'info', args: ['info name','(value)'], helpText: 'Set or display a character’s info. Generally free-form, but try `name`,`description`,`race`, or `class`. Delete character info by writing `delete` as a value.'},
 						{ name: 'image', args: ['inserted picture'], helpText: 'Set a character’s picture. Simply upload a file and use this command as a comment'},
 						{ name: 'portrait', args: ['inserted picture'], helpText: 'Set a character’s portrait picture. Simply upload a file and use this command as a comment'},
+						{ name: 'thumbnail', args: ['inserted picture'], helpText: 'Set a character’s thumbnail picture. Simply upload a file and use this command as a comment'},
 						{ name: 'sheet', args: ['(name)'], helpText: 'Displays a character sheet for a character. Defaults to your current character.'}
 					];
 
@@ -552,7 +554,7 @@ module.exports = (BotBase) => {
 						});
 					}
 				} else {
-					const retry = step.retry || step.open;
+					const retry = step.repeat || step.open;
 					return Bluebird.resolve(retry(track, message, this))
 					.then((text) => {
 						track.ready = true;
@@ -618,7 +620,7 @@ module.exports = (BotBase) => {
 		}
 
 		newCharacter(params, message) {
-			const name = params._.join(' ');
+			const name = BotBase.sanitize(params._.join(' '));
 			const character = { name };
 			character.template = (params && params.type) || null;
 
@@ -700,7 +702,7 @@ module.exports = (BotBase) => {
 				const character = userSettings.characters.find(c => c.name === name);
 
 				if(!character) {
-					return message.channel.send(`I don’t believe I’ve met ${safeName}…`);
+					return message.channel.send(`I don’t believe I’ve met ${BotBase.sanitize(safeName)}…`);
 				}
 
 				const idx = userSettings.characters.findIndex((c) => c.name === character.name);
@@ -722,7 +724,7 @@ module.exports = (BotBase) => {
 					return this.saveSetting(message.member, true, userSettings, true)
 				})
 				.then(() => {
-					return message.channel.send(`Goodbye ${name}! It was nice knowing you.`);
+					return message.channel.send(`Goodbye ${BotBase.sanitize(name)}! It was nice knowing you.`);
 				});
 			});
 		}
@@ -919,7 +921,7 @@ module.exports = (BotBase) => {
 				const result = fm.get(name);
 
 				if(!result.value && name !== '') {
-					return message.channel.send(`I don’t believe I’ve met ${name}…`);
+					return message.channel.send(`I don’t believe I’ve met ${BotBase.sanitize(name)}…`);
 				}
 
 				if(name !== '') {
@@ -990,7 +992,7 @@ module.exports = (BotBase) => {
 							return message.channel.send(`**${member.displayName}:** An error occurred for that user.`);
 						});
 					} else {
-						return `**${member}:** I couldn’t find that user.`;
+						return `**${BotBase.sanitize(member)}:** I couldn’t find that user.`;
 					}
 				})
 				.then((results) => {
@@ -1035,7 +1037,7 @@ module.exports = (BotBase) => {
 					if(result) {
 						return message.channel.send(`${result.character} is played by **${result.user.displayName}**`);
 					} else {
-						return message.channel.send(`I don’t believe I’ve met ${name}…`);
+						return message.channel.send(`I don’t believe I’ve met ${BotBase.sanitize(name)}…`);
 					}
 				});
 		}
@@ -1063,7 +1065,7 @@ module.exports = (BotBase) => {
 			.then(foundCharacter => {
 				// Tried to search, and no result
 				if(!foundCharacter && name) {
-					return message.channel.send(`I don’t believe I’ve met ${name}…`);
+					return message.channel.send(`I don’t believe I’ve met ${BotBase.sanitize(name)}…`);
 				} else if(!foundCharacter) {
 					// Didn't try to search, but current user has no characters
 					return message.channel.send(`It doesn’t seem like you have a character to display.`);
@@ -1072,7 +1074,7 @@ module.exports = (BotBase) => {
 				// Get the member from the userId
 				const member = message.guild.members.get(foundCharacter.userId);
 				if(!member) {
-					return message.channel.send(`**${name}:** An error occurred for that character.`);
+					return message.channel.send(`**${BotBase.sanitize(name)}:** An error occurred for that character.`);
 				}
 				// Look up their info
 				return this.getSetting(member, true)
