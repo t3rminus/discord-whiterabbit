@@ -113,7 +113,7 @@ class TimezoneMixin extends BotBase {
 	}
 	
 	command__whenIs(params, message) {
-		params = params.trim();
+		params = this.sanitize(params.trim(), message);
 		
 		if(params.toLowerCase() === 'all' || params.toLowerCase() === 'everyone') {
 			return this.whenisAll(message);
@@ -161,7 +161,7 @@ class TimezoneMixin extends BotBase {
 							return `**${member.displayName}:**  An error occurred for that user.`;
 						});
 					} else {
-						return `**${BotBase.sanitize(member)}:** I couldn’t find that user.`;
+						return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
 					}
 				})
 				.then((results) => {

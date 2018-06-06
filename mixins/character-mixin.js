@@ -139,7 +139,7 @@ module.exports = (BotBase) => {
 				if(isSkip(message)) {
 					throw new Error('Sorry, this is the one thing I can’t skip.');
 				}
-				const name = BotBase.sanitize(message.content);
+				const name = bot.sanitize(message.content, track.server);
 				return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
 				.then((result) => {
 					if(result) {
@@ -163,12 +163,12 @@ module.exports = (BotBase) => {
 				return `Tell me about ${track.character.name}. What do they like? How do they dress? Where are they from? ` +
 					`Give me all the details of their life, so I know exactly who they are.`;
 			},
-			process: function(track, message) {
+			process: function(track, message, bot) {
 				if(isSkip(message) || isSkip(message,'no')) {
 					return message.author.sendMessage(`Moving right along!`)
 					.then(() => true);
 				} else {
-					track.character.description = BotBase.sanitize(message.content);
+					track.character.description = bot.sanitize(message.content, track.server);
 					return message.author.sendMessage(`Wonderful!`)
 					.then(() => true);
 				}
@@ -209,7 +209,7 @@ module.exports = (BotBase) => {
 				return `Is there any other information you want to add? You can say \`job\`, \`class\`, or \`race\`, or ` +
 					`really anything at all! If you’ve entered everything you want, say \`done\`.`;
 			},
-			process: function(track, message) {
+			process: function(track, message, bot) {
 				if(isSkip(message)) {
 					return message.author.sendMessage(`Okay! Skipping this for now.`)
 					.then(() => 'stat');
@@ -217,7 +217,7 @@ module.exports = (BotBase) => {
 					return message.author.sendMessage(`Alright, done with info.`)
 					.then(() => 'stat');
 				} else {
-					track.nextInfo = BotBase.sanitize(message.content);
+					track.nextInfo = bot.sanitize(message.content, track.server);
 					return true;
 				}
 			}
@@ -228,7 +228,7 @@ module.exports = (BotBase) => {
 			open: function(track) {
 				return `Okay! What should I put down for ${track.nextInfo}?`;
 			},
-			process: function(track, message) {
+			process: function(track, message, bot) {
 				const info = track.nextInfo;
 				delete track.nextInfo;
 				
@@ -237,7 +237,7 @@ module.exports = (BotBase) => {
 					.then(() => 'stat');
 				}
 				
-				track.character[info] = BotBase.sanitize(message.content);
+				track.character[info] = bot.sanitize(message.content, track.server);
 				return message.author.sendMessage(`Good! Noted.`)
 				.then(() => 'info');
 			}
@@ -260,7 +260,7 @@ module.exports = (BotBase) => {
 					+ game.stats[track.curStat].name.toLowerCase();
 				return `Okay, and what is their ${statName}?`;
 			},
-			process: function(track, message) {
+			process: function(track, message, bot) {
 				if(isSkip(message)) {
 					track.stats.shift();
 					return message.author.sendMessage(`Okay. You can set that later.`)
@@ -272,7 +272,7 @@ module.exports = (BotBase) => {
 					track.character.stats = {};
 				}
 				
-				const stat = BotBase.sanitize(message.content);
+				const stat = bot.sanitize(message.content, track.server);
 				track.character.stats[track.curStat] = stat;
 				
 				return Bluebird.try(() => {
@@ -307,7 +307,7 @@ module.exports = (BotBase) => {
 				if(isSkip(message)) {
 					throw new Error('Sorry, this is the one thing I can’t skip.');
 				}
-				const name = BotBase.sanitize(message.input);
+				const name = bot.sanitize(message.input, track.server);
 				return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
 				.then((result) => {
 					if(result) {
@@ -620,7 +620,7 @@ module.exports = (BotBase) => {
 		}
 
 		newCharacter(params, message) {
-			const name = BotBase.sanitize(params._.join(' '));
+			const name = this.sanitize(params._.join(' '), message);
 			const character = { name };
 			character.template = (params && params.type) || null;
 
@@ -702,7 +702,7 @@ module.exports = (BotBase) => {
 				const character = userSettings.characters.find(c => c.name === name);
 
 				if(!character) {
-					return message.channel.send(`I don’t believe I’ve met ${BotBase.sanitize(safeName)}…`);
+					return message.channel.send(`I don’t believe I’ve met ${this.sanitize(safeName, message)}…`);
 				}
 
 				const idx = userSettings.characters.findIndex((c) => c.name === character.name);
@@ -724,7 +724,7 @@ module.exports = (BotBase) => {
 					return this.saveSetting(message.member, true, userSettings, true)
 				})
 				.then(() => {
-					return message.channel.send(`Goodbye ${BotBase.sanitize(name)}! It was nice knowing you.`);
+					return message.channel.send(`Goodbye ${this.sanitize(name, message)}! It was nice knowing you.`);
 				});
 			});
 		}
@@ -921,7 +921,7 @@ module.exports = (BotBase) => {
 				const result = fm.get(name);
 
 				if(!result.value && name !== '') {
-					return message.channel.send(`I don’t believe I’ve met ${BotBase.sanitize(name)}…`);
+					return message.channel.send(`I don’t believe I’ve met ${this.sanitize(name, message)}…`);
 				}
 
 				if(name !== '') {
@@ -992,7 +992,7 @@ module.exports = (BotBase) => {
 							return message.channel.send(`**${member.displayName}:** An error occurred for that user.`);
 						});
 					} else {
-						return `**${BotBase.sanitize(member)}:** I couldn’t find that user.`;
+						return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
 					}
 				})
 				.then((results) => {
@@ -1037,7 +1037,7 @@ module.exports = (BotBase) => {
 					if(result) {
 						return message.channel.send(`${result.character} is played by **${result.user.displayName}**`);
 					} else {
-						return message.channel.send(`I don’t believe I’ve met ${BotBase.sanitize(name)}…`);
+						return message.channel.send(`I don’t believe I’ve met ${this.sanitize(name, message)}…`);
 					}
 				});
 		}
@@ -1065,7 +1065,7 @@ module.exports = (BotBase) => {
 			.then(foundCharacter => {
 				// Tried to search, and no result
 				if(!foundCharacter && name) {
-					return message.channel.send(`I don’t believe I’ve met ${BotBase.sanitize(name)}…`);
+					return message.channel.send(`I don’t believe I’ve met ${this.sanitize(name, message)}…`);
 				} else if(!foundCharacter) {
 					// Didn't try to search, but current user has no characters
 					return message.channel.send(`It doesn’t seem like you have a character to display.`);
@@ -1074,7 +1074,7 @@ module.exports = (BotBase) => {
 				// Get the member from the userId
 				const member = message.guild.members.get(foundCharacter.userId);
 				if(!member) {
-					return message.channel.send(`**${BotBase.sanitize(name)}:** An error occurred for that character.`);
+					return message.channel.send(`**${this.sanitize(name, message)}:** An error occurred for that character.`);
 				}
 				// Look up their info
 				return this.getSetting(member, true)
