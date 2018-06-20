@@ -7,8 +7,10 @@ module.exports = (BotBase) =>
 			super();
 
 			this.commands['response'] = {
-				helpText: 'When you say __marco__, I say __polo__. Enclose marco/polo in `"` quotes. Use `"delete"` for polo to remove a response. Use --fuzzy to roughly match, and --partial to respond if it’s anywhere in a message.',
-				args: ['"marco"','"polo"','(--fuzzy)','(--partial)'],
+				helpText: 'When you say __marco__, I say __polo__. Enclose marco/polo in `"` quotes. Use `"delete"` ' +
+				'for polo to remove a response. Use --fuzzy to roughly match, and --partial to respond if it’s ' +
+				'anywhere in a message. Add more than one "polo" to randomly select one.',
+				args: ['"marco"','"polo"','(..."polo")','(--fuzzy)','(--partial)'],
 				method: 'command__response',
 				adminOnly: true
 			};
@@ -18,7 +20,7 @@ module.exports = (BotBase) =>
 
 		command__response(params, message) {
 			return this.isAdmin(message).then(() => {
-				if(params._.length !== 2) {
+				if(params._.length < 2) {
 					throw new Error('Unknown number of parameters');
 				}
 
@@ -27,7 +29,11 @@ module.exports = (BotBase) =>
 			.then((settings) => {
 				settings.responses = settings.responses || [];
 				const marco = params._[0].toLowerCase();
-				const polo = params._[1];
+				let polo = params._[1];
+				if(params._.length > 2) {
+					polo = params._.slice(1);
+				}
+
 				if(polo === 'delete') {
 					const del = settings.responses.findIndex((i) => i.marco === marco);
 					if(del > -1) {
@@ -54,12 +60,16 @@ module.exports = (BotBase) =>
 
 				return this.saveServerSettings(message, settings, true)
 					.then(() => {
+						let theResp = `"${polo}"`;
+						if(Array.isArray(polo)) {
+							theResp = `one of ${polo.length} things`;
+						}
 						if(params['fuzzy']) {
-							return message.channel.send(`Ok! When someone says something similar to "${marco}, I’ll say "${polo}"!`);
+							return message.channel.send(`Ok! When someone says something similar to "${marco}, I’ll say ${theResp}!`);
 						} else if(params['partial']) {
-							return message.channel.send(`Ok! When someone says something with "${marco}" in it, I’ll say "${polo}"!`);
+							return message.channel.send(`Ok! When someone says something with "${marco}" in it, I’ll say ${theResp}!`);
 						} else {
-							return message.channel.send(`Ok! When someone says "${marco}", I’ll say "${polo}"!`);
+							return message.channel.send(`Ok! When someone says "${marco}", I’ll say ${theResp}!`);
 						}
 					});
 			});
@@ -71,7 +81,12 @@ module.exports = (BotBase) =>
 				.then((settings) => {
 					const response = ResponderMixin.findResponse(settings, message.content.toLowerCase());
 					if(response) {
-						message.channel.send(response.polo);
+						if(Array.isArray(response.polo)) {
+							const responseText = response.polo[Math.floor(Math.random() * response.polo.length)];
+							message.channel.send(responseText);
+						} else {
+							message.channel.send(response.polo);
+						}
 						return true;
 					}
 				});
