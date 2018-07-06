@@ -96,7 +96,7 @@ module.exports = (BotBase) =>
 			}
 			return pr.get(WOOF_API)
 				.then(file => {
-					if(/.jpe?g$/i.test(file)) {
+					if(/\.jpe?g$/i.test(file)) {
 						return message.channel.send(new BotBase.Discord.Attachment(`https://random.dog/${file}`, file));
 					} else {
 						return this.command__woof(params, message, count ? count + 1 : 1);

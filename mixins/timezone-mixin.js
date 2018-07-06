@@ -112,95 +112,77 @@ class TimezoneMixin extends BotBase {
 		});
 	}
 	
-	command__whenIs(params, message) {
+	async command__whenIs(params, message) {
 		params = this.sanitize(params.trim(), message);
 		
 		if(params.toLowerCase() === 'all' || params.toLowerCase() === 'everyone') {
 			return this.whenisAll(message);
 		}
+		params = Misc.tokenizeString(params).map(p => p.trim()).filter(p => p);
 		
-		params = params.split(/(, ?| |; ?)/);
-		params = params.filter(p => p.length && !/^\s+$/.test(p) && !/^(, ?| |; ?)$/.test(p));
+		const myData = await this.getSetting(message.member);
+		if (myData) {
+			// Current info
+			myData.user = message.member.id;
+		}
 		
-		return this.getSetting(message.member)
-		.then((myData) => {
-			if(myData) {
-				// Current info
-				myData.user = message.member.id;
-			}
-			
-			// Map all the searched names to users
-			return this.findUsers(params, message)
-			.then((members) => {
-				if(!members) {
-					return this.fail(message);
-				}
-				
-				// For each member, figure out who they are and look up their info
-				return Bluebird.map(members, (member) => {
-					if(member && member.id === this.bot.user.id) {
-						const userData = {
-							user: member.id,
-							timezone: 'Europe/Wonderland',
-							isBot: true
-						};
+		const members = await this.findUsers(params, message);
+		if(!members) {
+			return this.fail(message);
+		}
+		
+		const infoResult = members.map(async (member) => {
+			if(member && member.id === this.bot.user.id) {
+				const userData = {
+					user: member.id,
+					timezone: 'Europe/Wonderland',
+					isBot: true
+				};
+				return TimezoneMixin.whenIsMessage(member, userData, myData);
+			} else if(member && member.id) {
+				// Get the user's info
+				try {
+					const userData = await this.getSetting(member);
+					// Show a message for them
+					if(userData && userData.timezone) {
+						userData.user = member.id;
 						return TimezoneMixin.whenIsMessage(member, userData, myData);
-					} else if(member && member.id) {
-						// Get the user's info
-						return this.getSetting(member)
-						.then((userData) => {
-							// Show a message for them
-							if(userData) {
-								userData.user = member.id;
-								return TimezoneMixin.whenIsMessage(member, userData, myData);
-							} else {
-								return `**${member.displayName}:** I couldn’t find that user’s data.`;
-							}
-						})
-						.catch(() => {
-							return `**${member.displayName}:**  An error occurred for that user.`;
-						});
 					} else {
-						return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
+						return `**${member.displayName}:** I couldn’t find that user’s data.`;
 					}
-				})
-				.then((results) => {
-					// If we have exactly 2 users, and every one was found
-					if(members.length === 2 && members.every((m) => !!(m && m.id))) {
-						return Bluebird.join(
-							this.getSetting(members[0]),
-							this.getSetting(members[1]),
-							(data1, data2) => {
-								if(data1 && data2) {
-									const diff = TimezoneMixin.getTimezoneDifference(data1.timezone, data2.timezone);
-									
-									if (diff.difference === 0) {
-										// Same time zone
-										return `${members[0].displayName} is in the ` +
-											`same time zone as ${members[1].displayName}`;
-									} else {
-										// Different time zone
-										return `${members[0].displayName} is ${diff.formatted} ` +
-											`${diff.plural} ${diff.comparison} ${members[1].displayName}`;
-									}
-								}
-							})
-						.then((text) => {
-							// Add it to the results
-							if(text) {
-								results.push(text);
-							}
-							return results;
-						});
-					}
-					return results;
-				})
-				.then((results) => {
-					// Join all results with newlines, and print the message
-					message.channel.send(results.join('\n\n'));
-				});
-			});
-		});
+				} catch(err) {
+					return `**${member.displayName}:**  An error occurred for that user.`;
+				}
+			} else {
+				return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
+			}
+		})
+		
+		// For each member, figure out who they are and look up their info
+		const results = await Promise.all(infoResult);
+		
+		// If we have exactly 2 users, and every one was found
+		if(members.length === 2 && members.every((m) => !!(m && m.id))) {
+			const data1 = await this.getSetting(members[0]);
+			const data2 = await this.getSetting(members[1]);
+			
+			if(data1 && data1.timezone && data2 && data2.timezone) {
+				const diff = TimezoneMixin.getTimezoneDifference(data1.timezone, data2.timezone);
+				
+				if (diff.difference === 0) {
+					// Same time zone
+					results.push(`${members[0].displayName} is in the ` +
+						`same time zone as ${members[1].displayName}`);
+				} else {
+					// Different time zone
+					results.push(`${members[0].displayName} is ${diff.formatted} ` +
+						`${diff.plural} ${diff.comparison} ${members[1].displayName}`);
+				}
+			}
+		}
+		
+		// Join all results with newlines, and print the message
+		return message.channel.send(results.join('\n\n'));
 	}
 	
 	whenisAll(message) {
@@ -253,7 +235,7 @@ class TimezoneMixin extends BotBase {
 		if(theirData.isBot) {
 			const time = BOT_TIMEZONE[Math.floor(Math.random() * BOT_TIMEZONE.length)];
 			return `**${user.displayName}:** Their local time ${time}`;
-		} else if (myData && myData.user !== theirData.user) {
+		} else if (myData && myData.timezone && myData.user !== theirData.user) {
 			let result = `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`;
 			const diff = TimezoneMixin.getTimezoneDifference(theirData.timezone, myData.timezone);
 			

@@ -31,8 +31,7 @@ module.exports = (BotBase) =>
 				}
 				
 				return message.channel.bulkDelete(count + 1)
-					.catch((err) => {
-						console.log(err);
+					.catch(() => {
 						return message.channel.send('How dreadful! I wasn’t permitted to behead any messages. You may need to invite me again!');
 					});
 			}, () => {});

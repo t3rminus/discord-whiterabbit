@@ -3,98 +3,16 @@
 const Bluebird = require('bluebird'),
 	YargsParser = require('yargs-parser'),
 	FuzzyMatching = require('fuzzy-matching'),
-	Misc = require('../lib/misc');
+	Misc = require('../lib/misc'),
+	CharacterTemplates = require('../lib/character-templates');
 
-const dnd5eModifier = function(val) {
-	return Math.floor((val - 10) / 2);
-};
-
-const CharacterTemplates = {
-	'd&d5e': {
-		game: 'Dungeons & Dragons 5th Edition',
-		stats: {
-			'str': { name: 'Strength', abbrev: 'STR', calc: dnd5eModifier },
-			'dex': { name: 'Dexterity', abbrev: 'DEX', calc: dnd5eModifier },
-			'con': { name: 'Constitution', abbrev: 'CON', calc: dnd5eModifier },
-			'int': { name: 'Intelligence', abbrev: 'INT', calc: dnd5eModifier },
-			'wis': { name: 'Wisdom', abbrev: 'WIS', calc: dnd5eModifier },
-			'cha': { name: 'Charisma', abbrev: 'CHA', calc: dnd5eModifier },
-			'ac': { name: 'Armor Class', abbrev: 'AC' },
-			'hp': { name: 'Hit Point Maximum', abbrev: 'Max HP' },
-			'speed': { name: 'Speed' },
-			'exp': { name: 'Experience', abbrev: 'XP' }
-		},
-		derivedStats: {
-			'level': {
-				name: 'Level',
-				abbrev: 'Level',
-				alias: ['lvl'],
-				calc: (character) => {
-					if(!character || !character.stats || !character.stats.exp) {
-						return null;
-					}
-					const exp = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,
-								 100000,120000,140000,165000,195000,225000,265000,305000,355000,Infinity];
-					const level = exp.findIndex((i) => character.stats.exp < i);
-					return Math.max(level, 1) || null;
-				}
-			},
-			'proficiency': {
-				name: 'Proficiency',
-				abbrev: 'Proficiency',
-				alias: ['prof','pro','pr'],
-				calc: (character) => {
-					const level = CharacterTemplates['d&d5e'].derivedStats.level.calc(character);
-					if(level === null) {
-						return null;
-					}
-
-					if(level > 16) {
-						return 6;
-					} else if(level > 12) {
-						return 5;
-					} else if(level > 8) {
-						return 4;
-					} else if(level > 4) {
-						return 3;
-					} else {
-						return 2;
-					}
-				}
-			},
-			'initiative': {
-				name: 'Initiative',
-				abbrev: 'Initiative',
-				alias: ['init'],
-				calc: (character) => {
-					if(character.stats.dex) {
-						return CharacterTemplates['d&d5e'].stats.dex.calc(character.stats.dex);
-					} else {
-						return null;
-					}
-				}
-			},
-			'passive_perception': {
-				name: 'Passive Perception',
-				abbrev: 'Passive Perception',
-				calc: (character) => {
-					if(character.stats.wis) {
-						return 10 + CharacterTemplates['d&d5e'].stats.wis.calc(character.stats.wis);
-					} else {
-						return null;
-					}
-				}
-			}
-		}
-	}
-};
 const CharacterNameDistance = 0.8;
 
 class ExistingCharacter extends Error {
 	constructor(...args) { super(...args); Error.captureStackTrace(this, ExistingCharacter); }
 }
 
-const capitalize = (string) => string.charAt(0).toUpperCase() + string.slice(1);
+const capitalize = (string) => string.replace(/(^|\s)\S/g, (m) => m.toUpperCase());
 
 /**
  * TODO:
@@ -366,22 +284,23 @@ module.exports = (BotBase) => {
 		}
 
 		command__character(params, message) {
-			const parsedParams = YargsParser(params);
-			const command = parsedParams._.shift();
-			switch(command) {
+			const command = (/^\w+\s*/.exec(params) || [''])[0];
+			
+			switch(command.trim()) {
+				case '':
 				case 'help':
 					return this.characterHelp(message);
 				case 'walkthrough':
 					return this.startWalkthrough(message);
 				case 'create':
 				case 'new':
-					return this.newCharacter(parsedParams, message);
+					return this.newCharacter(YargsParser(params), message);
 				case 'delete':
-					return this.deleteCharacter(params.replace(command,''), message);
+					return this.deleteCharacter(params.replace(command,'').trim(), message);
 				case 'stat':
-					return this.characterStat(parsedParams, message);
+					return this.characterStat(params, message);
 				case 'info':
-					return this.characterInfo(params.replace(command,''), message);
+					return this.characterInfo(params, message);
 				case 'pic':
 				case 'picture':
 				case 'photo':
@@ -393,7 +312,7 @@ module.exports = (BotBase) => {
 				case 'mugshot':
 					return this.characterPic(params, message, true);
 				case 'sheet':
-					return this.characterSheet(params.replace(command,''), message);
+					return this.characterSheet(params.replace(command,'').trim(), message);
 				default:
 					return this.fail(message);
 			}
@@ -402,13 +321,15 @@ module.exports = (BotBase) => {
 		characterHelp(message) {
 			return this.getServerSettings(message)
 				.then(serverSettings => {
-					let reply = 'Character commands.\n\n';
+					let reply = `I can help keep track of your roleplay character! If you're not sure how to get ` +
+						`started, by far the easiest method is \`?character walkthrough\`.\n\n`;
 
 					const templates = Object.keys(CharacterTemplates).map(t => `\`${t}\``).join(',');
 
 					const commands = [
 						{ name: 'help', helpText: 'Get help for character commands.'},
-						{ name: 'create', args: ['name','(--type TEMPLATE)'], helpText: 'Create a character. Current templates are ' + templates},
+						{ name: 'walkthrough', helpText: 'Create a character with a step-by-step walkthrough.'},
+						{ name: 'create', args: ['name','(--type TEMPLATE)'], helpText: 'Create a character manually. Current templates are ' + templates},
 						{ name: 'delete', args: ['exact name'], helpText: 'Delete a character. Be careful!'},
 						{ name: 'stat', args: ['stat name','(value)'], helpText: 'Set or display a character stat. Depends on template (if used).'},
 						{ name: 'info', args: ['info name','(value)'], helpText: 'Set or display a character’s info. Generally free-form, but try `name`,`description`,`race`, or `class`. Delete character info by writing `delete` as a value.'},
@@ -466,7 +387,6 @@ module.exports = (BotBase) => {
 				});
 			});
 		}
-
 
 		walkthrough(message) {
 			if(message.channel.type === 'dm' && message.author.id !== this.bot.user.id) {
@@ -620,6 +540,11 @@ module.exports = (BotBase) => {
 		}
 
 		newCharacter(params, message) {
+			if(!params || !params._ || !params._.length) {
+				return this.fail(message);
+			}
+			
+			params._.shift(); // get rid of "create/new"
 			const name = this.sanitize(params._.join(' '), message);
 			const character = { name };
 			character.template = (params && params.type) || null;
@@ -628,7 +553,7 @@ module.exports = (BotBase) => {
 			.then((character) => {
 				// Character created!
 				const type = (character.template && CharacterTemplates[character.template] &&
-					CharacterTemplates[character.template].game) || 'freeform';
+					CharacterTemplates[character.template].game) || 'free-form';
 				return message.channel.send(`Nice to meet you, ${character.name}! I’ll keep track of your ${type} stats.`);
 			})
 			.catch(ExistingCharacter, (err) => {
@@ -738,11 +663,19 @@ module.exports = (BotBase) => {
 		}
 
 		characterStat(params, message) {
-			const stat = params._[0].trim();
-			let value = params._[1];
-
-			if(value && value.trim) {
-				value = value.trim();
+			const parsedParams = Misc.tokenizeString(params, 2);
+			parsedParams.shift(); // Get rid of "stat"
+			
+			if(!parsedParams || parsedParams.length < 2) {
+				return this.fail(message);
+			}
+			
+			let [stat, value] = parsedParams;
+			stat = this.sanitize(stat, message);
+			value = this.sanitize(value, message);
+			
+			if(!stat) {
+				return this.fail(message);
 			}
 
 			return this.getSetting(message.member, true)
@@ -832,14 +765,19 @@ module.exports = (BotBase) => {
 		}
 
 		characterInfo(params, message) {
-			const parsedParams = /^(\w+)\s*([\s\S]*)$/.exec(params.trim());
-			if(!parsedParams || !parsedParams[1]) {
+			const parsedParams = Misc.tokenizeString(params, 2);
+			parsedParams.shift(); // Get rid of "info"
+			
+			if(!parsedParams || parsedParams.length < 2) {
 				return this.fail(message);
 			}
-			const info = parsedParams[1].toLowerCase();
-			const value = parsedParams[2].trim();
+			
+			let [info, value] = parsedParams;
+			info = this.sanitize(info, message).toLowerCase();
+			value = this.sanitize(value, message);
 
-			if(['stats','image'].indexOf(info) >= 0) {
+			const infoBlacklist = ['image','thumbnail','stats'];
+			if(infoBlacklist.includes(info)) {
 				return this.fail(message);
 			}
 
@@ -879,24 +817,24 @@ module.exports = (BotBase) => {
 						return this.saveSetting(message.member, true, userSettings, true)
 						.then(() => {
 							if(character[info] && character[info].length > 15) {
-								return message.channel.send(`Great! ${character.name}’s ${info} is saved.`);
+								return message.channel.send(`Great! ${character.name}’s ${capitalize(info)} is saved.`);
 							} else if(character[info]) {
-								return message.channel.send(`Great! ${character.name}’s ${info} is now ${character[info]}`);
+								return message.channel.send(`Great! ${character.name}’s ${capitalize(info)} is now ${character[info]}`);
 							} else {
-								return message.channel.send(`I’ve forgotten ${character.name}’s ${info}`);
+								return message.channel.send(`I’ve forgotten ${character.name}’s ${capitalize(info)}`);
 							}
 						});
 					});
 				} else if(character[info]) {
 					// No, but the stat exists. Display the stat
 					if(character[info].length > 15) {
-						return message.channel.send(`${character.name}’s ${info} is as follows:\n\`\`\`${character[info]}\`\`\``);
+						return message.channel.send(`${character.name}’s ${capitalize(info)} is as follows:\n\`\`\`${character[info]}\`\`\``);
 					} else {
-						return message.channel.send(`${character.name}’s ${info} is ${character[info]}`);
+						return message.channel.send(`${character.name}’s ${capitalize(info)} is ${character[info]}`);
 					}
 				} else {
 					// Nothing doing.
-					return message.channel.send(`${character.name}’s ${info} not currently being tracked.`);
+					return message.channel.send(`${character.name}’s ${capitalize(info)} not currently being tracked.`);
 				}
 			});
 		}
@@ -1091,6 +1029,9 @@ module.exports = (BotBase) => {
 						// Render the sheet
 						return this.renderSheet(character, member, message);
 					});
+			})
+			.catch((err) => {
+				console.log(err);
 			});
 		}
 
@@ -1127,7 +1068,7 @@ module.exports = (BotBase) => {
 			if(character.template && CharacterTemplates[character.template] &&
 				CharacterTemplates[character.template].derivedStats &&
 				CharacterTemplates[character.template].derivedStats.level &&
-				!character.level && !character.stats.level) {
+				!character.level && (character.stats && !character.stats.level)) {
 				const level = CharacterTemplates[character.template].derivedStats.level.calc(character);
 				if(level || level === 0) {
 					character.level = level;
@@ -1156,12 +1097,12 @@ module.exports = (BotBase) => {
 				const statKeys = Object.keys(template.stats);
 				statKeys.forEach((stat) => {
 					const statName = template.stats[stat].abbrev || template.stats[stat].name;
-					let statVal = (character.stats && character.stats[stat]) || 'Not Set';
-					if(template.stats[stat].calc && character.stats[stat]) {
-						const modifier = template.stats[stat].calc(character.stats[stat]);
+					let statVal = (character.stats && character.stats[stat]);
+					if(template.stats[stat].calc && statVal) {
+						const modifier = template.stats[stat].calc(statVal);
 						statVal = `${modifier > 0 ? '+' + modifier : modifier} (${character.stats[stat]})`;
 					}
-					replyObj.fields.push({ name: statName, value: statVal, inline: true });
+					replyObj.fields.push({ name: statName, value: statVal || 'Not Set', inline: true });
 				});
 				if(CharacterTemplates[character.template].derivedStats) {
 					const derivedKeys = Object.keys(template.derivedStats);
@@ -1284,8 +1225,7 @@ module.exports = (BotBase) => {
 		}
 	}
 
-
-
+	
 	CharacterMixin.ExistingCharacter = ExistingCharacter;
 
 	return CharacterMixin;
