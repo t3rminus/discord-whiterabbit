@@ -156,7 +156,7 @@ class TimezoneMixin extends BotBase {
 			} else {
 				return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
 			}
-		})
+		});
 		
 		// For each member, figure out who they are and look up their info
 		const results = await Promise.all(infoResult);

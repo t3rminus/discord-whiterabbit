@@ -1125,7 +1125,7 @@ module.exports = (BotBase) => {
 			}
 
 			const fieldBlacklist = ['title','name','race','description','image','stats','level',
-									'class','occupation','job','template'];
+									'class','occupation','job','template','thumbnail'];
 			const infoFields = Object.keys(character).filter(i => fieldBlacklist.indexOf(i) < 0);
 			infoFields.forEach(info => {
 				replyObj.fields.push({ name: capitalize(info), value: character[info] });
