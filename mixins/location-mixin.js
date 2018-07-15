@@ -46,7 +46,7 @@ module.exports = (BotBase) =>
 				sort: 15
 			};
 
-			this.bot.on('guildMemberRemove', this.tzHandleLeave.bind(this));
+			// this.bot.on('guildMemberRemove', this.plHandleLeave.bind(this));
 		}
 
 		command__place(params, message) {
@@ -55,10 +55,10 @@ module.exports = (BotBase) =>
 			}
 
 			// Look up their timezone
-			return LocationMixin.LookupTimezone(params)
+			return LocationMixin.LookupLocation(params)
 				.then((result) => {
 					// Update global timezone list
-					return this.manageTimezoneList(message.member, result)
+					/*return this.manageLocationList(message.member, result)
 						.then(() => {
 							// Save the individual user's setting
 							return this.saveSetting(message.member, true, result);
@@ -69,14 +69,14 @@ module.exports = (BotBase) =>
 								`**Your location:** ${result.timezone}\n`;
 
 							message.channel.send(reply);
-						});
+						});*/
 				})
 				.catch(NoResultError, (err) => {
 					message.channel.send(err.message);
 				});
 		}
 
-		command__placeDelete(params, message) {
+		/*command__placeDelete(params, message) {
 			return this.manageTimezoneList(message.member)
 				.then(() => {
 					// Delete the saved data
@@ -87,9 +87,9 @@ module.exports = (BotBase) =>
 							message.channel.send(reply);
 						});
 				});
-		}
+		} */
 
-		command__whereIs(params, message) {
+		/* command__whereIs(params, message) {
 			params = params.trim();
 
 			if(params.toLowerCase() === 'all' || params.toLowerCase() === 'everyone') {
@@ -292,10 +292,10 @@ module.exports = (BotBase) =>
 					return this.saveSetting(member, '-timezones', data, true);
 				});
 		}
-
-		tzHandleLeave(member) {
+		
+		plHandleLeave(member) {
 			return this.manageLocationList(member);
-		}
+		}  */
 
 		static async LookupLocation(place) {
 			let address, location;
@@ -307,6 +307,7 @@ module.exports = (BotBase) =>
 			return result;
 		}
 
+		/*
 		static getLocationDifference(zone1, zone2) {
 			const now = moment.utc();
 			// get the zone offsets for this time, in minutes
@@ -328,4 +329,5 @@ module.exports = (BotBase) =>
 				comparison: comparison
 			};
 		}
+		*/
 	};
