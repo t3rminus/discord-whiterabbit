@@ -1,6 +1,7 @@
 'use strict';
 const pr = require('request-promise'),
 	moment = require('moment-timezone'),
+	geolib = require('geolib'),
 	Bluebird = require('bluebird'),
 	Misc = require('../lib/misc');
 
@@ -49,55 +50,59 @@ module.exports = (BotBase) =>
 			// this.bot.on('guildMemberRemove', this.plHandleLeave.bind(this));
 		}
 
-		command__place(params, message) {
+		async command__place(params, message) {
 			if(/^\s*$/.test(params)) {
 				return this.fail(message);
 			}
 
-			// Look up their timezone
-			return LocationMixin.LookupLocation(params)
-				.then((result) => {
-					// Update global timezone list
-					/*return this.manageLocationList(message.member, result)
-						.then(() => {
-							// Save the individual user's setting
-							return this.saveSetting(message.member, true, result);
-						})
-						.then(() => {
-							// Let them know what we found
-							const reply = 'I’ll remember your info, so you’ll never be lost!\n\n' +
-								`**Your location:** ${result.timezone}\n`;
+			try {
+				// Lookup location
+				const location = await LocationMixin.LookupLocation(params);
 
-							message.channel.send(reply);
-						});*/
-				})
-				.catch(NoResultError, (err) => {
-					message.channel.send(err.message);
-				});
+				// Save it
+				const serverSettings = await this.getSetting(message.member, '-location');
+				serverSettings[message.member.id] = location;
+				await this.saveSetting(message.member, '-location', serverSettings, true);
+
+				// Let them know!
+				const reply = 'I’ll remember your info, so you’ll never be lost!\n\n' +
+					`**Your location:** ${location.formatted}\n`;
+				return message.channel.send(reply);
+			} catch(err) {
+				if(err instanceof NoResultError) {
+					return message.channel.send(err.message);
+				}
+				throw err;
+			}
 		}
 
-		/*command__placeDelete(params, message) {
-			return this.manageTimezoneList(message.member)
-				.then(() => {
-					// Delete the saved data
-					return this.saveSetting(message.member, true, null, true)
-						.then(() => {
-							// Let the user know
-							const reply = 'Poof! Your data is forgotten.';
-							message.channel.send(reply);
-						});
-				});
-		} */
+		async command__placeDelete(params, message) {
+			const serverSettings = await this.getSetting(message.member, '-location');
+			delete serverSettings[message.member.id];
+			await this.saveSetting(message.member, '-location', serverSettings, true);
+			return message.channel.send('Poof! Your data is forgotten.');
+		}
 
-		/* command__whereIs(params, message) {
-			params = params.trim();
-
+		async command__whereIs(params, message) {
 			if(params.toLowerCase() === 'all' || params.toLowerCase() === 'everyone') {
-				return this.whenisAll(message);
+				return this.whereIsAll(message);
 			}
 
-			params = params.split(/(, ?| |; ?)/);
-			params = params.filter(p => p.length && !/^\s+$/.test(p) && !/^(, ?| |; ?)$/.test(p));
+			params = Misc.tokenizeString(params);
+
+			const locations = await this.getSetting(message.member, '-location');
+			const myData = locations && locations[message.member.id];
+
+			const allUsers = await this.findUsers(params, message);
+			const users = allUsers.filter(m => !m.user.bot);
+			const bots = allUsers.filter(m => m.user.bot);
+
+			bots.forEach(b => {
+				locations[b] = {
+					
+				}
+			});
+
 
 			return this.getSetting(message.member)
 				.then((myData) => {
@@ -292,19 +297,37 @@ module.exports = (BotBase) =>
 					return this.saveSetting(member, '-timezones', data, true);
 				});
 		}
-		
+
 		plHandleLeave(member) {
 			return this.manageLocationList(member);
 		}  */
 
 		static async LookupLocation(place) {
-			let address, location;
 			const result = JSON.parse(await pr('https://maps.googleapis.com/maps/api/geocode/json?address=' + encodeURIComponent(place)));
 			if (result.status !== 'OK' || !result.results || !result.results[0]) {
 				throw new NoResultError('Could not find that location');
 			}
 
-			return result;
+			const {results: [firstResult = { address_components: [] }] = []} = result;
+
+			let city = firstResult.address_components.find(c => c.types.includes('locality')) || null;
+			let province = firstResult.address_components.find(c => c.types.includes('administrative_area_level_1')) || null;
+			let country = firstResult.address_components.find(c => c.types.includes('country')) || null;
+
+			city = city && city.long_name;
+			province = province && province.short_name;
+			country = country && country.long_name;
+
+			if(!country) {
+				throw new NoResultError('Could not find that location');
+			}
+
+			return {
+				lat: firstResult.geometry.location.lat,
+				lon: firstResult.geometry.location.lng,
+				city, province, country,
+				formatted: [city,province,country].filter(i => i).join(', ')
+			};
 		}
 
 		/*
