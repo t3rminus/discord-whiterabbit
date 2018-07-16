@@ -104,7 +104,7 @@ module.exports = (BotBase) =>
 
 			const users = await this.findUsers(params, message);
 			
-			users.filter(m => m.user.bot).forEach(b => {
+			users.filter(m => m && m.user && m.user.bot).forEach(b => {
 				const wonderland = geolib.computeDestinationPoint(birmingham, Math.random() * 200000, Math.random() * 360);
 				locations[b.user.id] = {
 					latitude: wonderland.latitude,
@@ -117,18 +117,22 @@ module.exports = (BotBase) =>
 			});
 			
 			const results = users.map(member => {
-				if(locations && locations[member.user.id]) {
-					if(myData) {
-						const distance = Math.round(geolib.getDistanceSimple(locations[member.user.id], myData) / 1000);
-						const displayDistance = userSettings && userSettings.units === 'imperial'
-							? `${formatNumber(distance / 1.609344)} miles`
-							: `${formatNumber(distance)} km`;
-						return `**${member.displayName}:** is in ${locations[member.user.id].formatted}. They are ${displayDistance} away from you.`;
+				if(member && member.id) {
+					if(locations && locations[member.user.id]) {
+						if(myData) {
+							const distance = Math.round(geolib.getDistanceSimple(locations[member.user.id], myData) / 1000);
+							const displayDistance = userSettings && userSettings.units === 'imperial'
+								? `${formatNumber(distance / 1.609344)} miles`
+								: `${formatNumber(distance)} km`;
+							return `**${member.displayName}:** is in ${locations[member.user.id].formatted}. They are ${displayDistance} away from you.`;
+						} else {
+							return `**${member.displayName}:** is in ${locations[member.user.id].formatted}`;
+						}
 					} else {
-						return `**${member.displayName}:** is in ${locations[member.user.id].formatted}`;
+						return `**${member.displayName}:** I couldn’t find that user’s data.`;
 					}
 				} else {
-					return `**${member.displayName}:** I couldn’t find that user’s data.`;
+					return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
 				}
 			}).filter(m => m);
 			
