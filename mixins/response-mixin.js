@@ -10,7 +10,7 @@ module.exports = (BotBase) =>
 				helpText: 'When you say __marco__, I say __polo__. Enclose marco/polo in `"` quotes. Use `"delete"` ' +
 				'for polo to remove a response. Use --fuzzy to roughly match, and --partial to respond if it’s ' +
 				'anywhere in a message. Add more than one "polo" to randomly select one.',
-				args: ['"marco"','"polo"','(..."polo")','(--fuzzy)','(--partial)'],
+				args: ['"marco"','"polo"','(..."polo")','(--fuzzy)','(--partial)','(--replace)'],
 				method: 'command__response',
 				adminOnly: true
 			};
@@ -55,7 +55,8 @@ module.exports = (BotBase) =>
 				settings.responses.push({
 					marco, polo,
 					fuzzy: params['fuzzy'],
-					partial: params['partial']
+					partial: params['partial'],
+					replace: params['replace']
 				});
 
 				return this.saveServerSettings(message, settings, true)
@@ -64,12 +65,13 @@ module.exports = (BotBase) =>
 						if(Array.isArray(polo)) {
 							theResp = `one of ${polo.length} things`;
 						}
+						const replace = params['replace'];
 						if(params['fuzzy']) {
-							return message.channel.send(`Ok! When someone says something similar to "${marco}, I’ll say ${theResp}!`);
+							return message.channel.send(`Ok! When someone says something similar to "${marco}, I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
 						} else if(params['partial']) {
-							return message.channel.send(`Ok! When someone says something with "${marco}" in it, I’ll say ${theResp}!`);
+							return message.channel.send(`Ok! When someone says something with "${marco}" in it, I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
 						} else {
-							return message.channel.send(`Ok! When someone says "${marco}", I’ll say ${theResp}!`);
+							return message.channel.send(`Ok! When someone says "${marco}", I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
 						}
 					});
 			});
@@ -87,6 +89,10 @@ module.exports = (BotBase) =>
 						} else {
 							message.channel.send(response.polo);
 						}
+						if(response.replace) {
+							message.delete();
+						}
+						
 						return true;
 					}
 				});
