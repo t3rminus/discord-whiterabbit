@@ -124,7 +124,13 @@ module.exports = (BotBase) =>
 							const displayDistance = userSettings && userSettings.units === 'imperial'
 								? `${formatNumber(distance / 1.609344)} miles`
 								: `${formatNumber(distance)} km`;
-							return `**${member.displayName}:** is in ${locations[member.user.id].formatted}. They are ${displayDistance} away from you.`;
+							if(member.user.id === message.member.id) {
+								return `**${member.displayName}:** is in ${locations[member.user.id].formatted}.`;
+							} else if(distance < 100) {
+								return `**${member.displayName}:** is in ${locations[member.user.id].formatted}. They are in the same place you are! Lucky!`;
+							} else {
+								return `**${member.displayName}:** is in ${locations[member.user.id].formatted}. They are ${displayDistance} away from you.`;
+							}
 						} else {
 							return `**${member.displayName}:** is in ${locations[member.user.id].formatted}`;
 						}
@@ -145,7 +151,7 @@ module.exports = (BotBase) =>
 						: `${formatNumber(distance)} km`;
 					
 					if(distance < 100) {
-						results.push(`${users[0].displayName} is in the same place as ${users[1].displayName}`);
+						results.push(`${users[0].displayName} is in the same place as ${users[1].displayName}! Lucky!`);
 					} else {
 						results.push(`${users[0].displayName} is ${displayDistance} away from ${users[1].displayName}`);
 					}
