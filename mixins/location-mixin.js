@@ -3,12 +3,20 @@ const pr = require('request-promise'),
 	moment = require('moment-timezone'),
 	geolib = require('geolib'),
 	Bluebird = require('bluebird'),
+	{ crc32 } = require('crc'),
 	Misc = require('../lib/misc');
 
 const unixTimestamp = function(date) {
 	date = date || new Date();
 	// date.getTime in MS, | 0 truncates integer
 	return (date.getTime() / 1000) | 0;
+};
+
+const birmingham = { latitude: 52.4774169, longitude: -1.9336706 };
+
+const formatNumber = (num, p = 2, d = 0, x = 3) => {
+	const re = '\\d(?=(\\d{' + x + '})+' + (d > 0 ? '\\.' : '$') + ')';
+	return (~~num.toPrecision(p)).toFixed(Math.max(0, ~~d)).replace(new RegExp(re, 'g'), '$&,');
 };
 
 class NoResultError extends Error {
@@ -47,7 +55,7 @@ module.exports = (BotBase) =>
 				sort: 15
 			};
 
-			// this.bot.on('guildMemberRemove', this.plHandleLeave.bind(this));
+			this.bot.on('guildMemberRemove', this.plHandleLeave.bind(this));
 		}
 
 		async command__place(params, message) {
@@ -60,7 +68,7 @@ module.exports = (BotBase) =>
 				const location = await LocationMixin.LookupLocation(params);
 
 				// Save it
-				const serverSettings = await this.getSetting(message.member, '-location');
+				const serverSettings = await this.getSetting(message.member, '-location') || {};
 				serverSettings[message.member.id] = location;
 				await this.saveSetting(message.member, '-location', serverSettings, true);
 
@@ -77,7 +85,7 @@ module.exports = (BotBase) =>
 		}
 
 		async command__placeDelete(params, message) {
-			const serverSettings = await this.getSetting(message.member, '-location');
+			const serverSettings = await this.getSetting(message.member, '-location') || {};
 			delete serverSettings[message.member.id];
 			await this.saveSetting(message.member, '-location', serverSettings, true);
 			return message.channel.send('Poof! Your data is forgotten.');
@@ -90,217 +98,98 @@ module.exports = (BotBase) =>
 
 			params = Misc.tokenizeString(params);
 
-			const locations = await this.getSetting(message.member, '-location');
+			const userSettings = await this.getSetting(message.member, true);
+			const locations = await this.getSetting(message.member, '-location') || {};
 			const myData = locations && locations[message.member.id];
 
-			const allUsers = await this.findUsers(params, message);
-			const users = allUsers.filter(m => !m.user.bot);
-			const bots = allUsers.filter(m => m.user.bot);
-
-			bots.forEach(b => {
-				locations[b] = {
-					
-				}
+			const users = await this.findUsers(params, message);
+			
+			users.filter(m => m.user.bot).forEach(b => {
+				const wonderland = geolib.computeDestinationPoint(birmingham, Math.random() * 200000, Math.random() * 360);
+				locations[b.user.id] = {
+					latitude: wonderland.latitude,
+					longitude: wonderland.longitude,
+					city: 'Wonderland',
+					province: null,
+					country: 'United Kingdom',
+					formatted: 'Wonderland, United Kingdom'
+				};
 			});
-
-
-			return this.getSetting(message.member)
-				.then((myData) => {
+			
+			const results = users.map(member => {
+				if(locations && locations[member.user.id]) {
 					if(myData) {
-						// Current info
-						myData.user = message.member.id;
+						const distance = Math.round(geolib.getDistanceSimple(locations[member.user.id], myData) / 1000);
+						const displayDistance = userSettings && userSettings.units === 'imperial'
+							? `${formatNumber(distance / 1.609344)} miles`
+							: `${formatNumber(distance)} km`;
+						return `**${member.displayName}:** is in ${locations[member.user.id].formatted}. They are ${displayDistance} away from you.`;
+					} else {
+						return `**${member.displayName}:** is in ${locations[member.user.id].formatted}`;
 					}
-
-					// Map all the searched names to users
-					return this.findUsers(params, message)
-						.then((members) => {
-							if(!members) {
-								return this.fail(message);
-							}
-
-							// For each member, figure out who they are and look up their info
-							return Bluebird.map(members, (member) => {
-								if(member && member.id === this.bot.user.id) {
-									const userData = {
-										user: member.id,
-										timezone: 'Europe/Wonderland',
-										isBot: true
-									};
-									return TimezoneMixin.whenIsMessage(member, userData, myData);
-								} else if(member && member.id) {
-									// Get the user's info
-									return this.getSetting(member)
-										.then((userData) => {
-											// Show a message for them
-											if(userData) {
-												userData.user = member.id;
-												return TimezoneMixin.whenIsMessage(member, userData, myData);
-											} else {
-												return `**${member.displayName}:** I couldn’t find that user’s data.`;
-											}
-										})
-										.catch(() => {
-											return `**${member.displayName}:**  An error occurred for that user.`;
-										});
-								} else {
-									return `**${member}:** I couldn’t find that user.`;
-								}
-							})
-								.then((results) => {
-									// If we have exactly 2 users, and every one was found
-									if(members.length === 2 && members.every((m) => !!(m && m.id))) {
-										return Bluebird.join(
-											this.getSetting(members[0]),
-											this.getSetting(members[1]),
-											(data1, data2) => {
-												if(data1 && data2) {
-													const diff = TimezoneMixin.getTimezoneDifference(data1.timezone, data2.timezone);
-
-													if (diff.difference === 0) {
-														// Same time zone
-														return `${members[0].displayName} is in the ` +
-															`same time zone as ${members[1].displayName}`;
-													} else {
-														// Different time zone
-														return `${members[0].displayName} is ${diff.formatted} ` +
-															`${diff.plural} ${diff.comparison} ${members[1].displayName}`;
-													}
-												}
-											})
-											.then((text) => {
-												// Add it to the results
-												if(text) {
-													results.push(text);
-												}
-												return results;
-											});
-									}
-									return results;
-								})
-								.then((results) => {
-									// Join all results with newlines, and print the message
-									message.channel.send(results.join('\n\n'));
-								});
-						});
-				});
-		}
-
-		whereisAll(message) {
-			return this.getSetting(message.member, '-timezones')
-				.then((data) => {
-					const result = [];
-					const timeMap = [];
-
-					// Group same times together, even if they're not in the same timezone
-					Object.keys(data).forEach((timezone) => {
-						const userData = data[timezone];
-						const timeKey = moment().tz(timezone).format('Hmm');
-						const timeData = timeMap.find((o) => o.key === timeKey);
-						if(timeData) {
-							timeData.users = timeData.users.concat(userData.users);
-							timeData.count += userData.count;
-						} else {
-							timeMap.push({
-								key: timeKey,
-								time: moment().tz(timezone).format('h:mma'),
-								users: userData.users,
-								count: userData.count
-							});
-						}
-					});
-
-					timeMap.sort((a,b) => (+a.key) - (+b.key));
-
-					timeMap.forEach((timeEntry) => {
-						const entryNames = timeEntry.users.slice(0,50);
-						let resultMessage = '**' + timeEntry.time + ':** '
-							+ (entryNames.map(u => message.guild.members.get(u))
-								.filter(u => !!u).map(u => u.displayName).join(', '));
-
-						if(entryNames.length !== timeEntry.count) {
-							resultMessage += ' …and ' + (timeEntry.count - entryNames.length) + ' more';
-						}
-
-						result.push(resultMessage);
-					});
-
-					return result;
-				})
-				.then((results) => {
-					message.channel.send(results.join('\n\n'));
-				});
-		}
-
-		static whereIsMessage(user, theirData, myData) {
-			if(theirData.isBot) {
-				const time = BOT_TIMEZONE[Math.floor(Math.random() * BOT_TIMEZONE.length)];
-				return `**${user.displayName}:** Their local time ${time}`;
-			} else if (myData && myData.user !== theirData.user) {
-				let result = `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`;
-				const diff = TimezoneMixin.getTimezoneDifference(theirData.timezone, myData.timezone);
-
-				if (diff.difference === 0) {
-					result += ' They are in the same time zone as you!';
 				} else {
-					result += ` They are ${diff.formatted} ${diff.plural} ${diff.comparison} you.`;
+					return `**${member.displayName}:** I couldn’t find that user’s data.`;
 				}
-				return result;
-			} else if (myData && myData.user === theirData.user) {
-				return `**${user.displayName}:** Your local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`
-			} else {
-				return `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`;
-			}
-		}
-
-		manageLocationList(member, newData) {
-			// Load global timezone list
-			return this.getSetting(member, '-timezones')
-				.then((data) => {
-					data = data || {};
-					Object.keys(data).forEach((tz) => {
-						// Remove the user from any lists they were in before
-						const oCount = data[tz].users.length;
-						data[tz].users.forEach((id) => {
-							if(!member.guild.members.get(id) || id === member.id.toString()) {
-								Misc.arrayRemove(data[tz].users, id)
-							}
-						});
-
-						// Update count if the user was removed
-						if(oCount > data[tz].users.length) {
-							data[tz].count -= (oCount - data[tz].users.length);
-						}
-
-						// Reset the count if we're below the limit. Otherwise data loss is acceptable.
-						if(data[tz].users.length < 50) {
-							data[tz].count = data[tz].users.length;
-						}
-
-						// Delete the timezone entirely if there are no more users registered
-						if(!data[tz].users.length) {
-							delete data[tz];
-						}
-					});
-
-					if(newData && newData.timezone) {
-						// Set-up the timezone list again if we need to
-						data[newData.timezone] = data[newData.timezone] || { users: [], count: 0 };
-						// If the list length is too long, don't add the user to it
-						if(data[newData.timezone].users.length < 50) {
-							data[newData.timezone].users.push(member.id.toString());
-						}
-						// Keep track of how many users in that timezone
-						data[newData.timezone].count++;
+			}).filter(m => m);
+			
+			if(users.length === 2) {
+				if(locations && locations[users[0].user.id] && locations[users[1].user.id]) {
+					const distance = Math.round(geolib.getDistanceSimple(locations[users[0].user.id], locations[users[1].user.id]) / 1000);
+					
+					const displayDistance = userSettings && userSettings.units === 'imperial'
+						? `${formatNumber(distance / 1.609344)} miles`
+						: `${formatNumber(distance)} km`;
+					
+					if(distance < 100) {
+						results.push(`${users[0].displayName} is in the same place as ${users[1].displayName}`);
+					} else {
+						results.push(`${users[0].displayName} is ${displayDistance} away from ${users[1].displayName}`);
 					}
-
-					// Save this!
-					return this.saveSetting(member, '-timezones', data, true);
-				});
+				}
+			}
+			
+			// Join all results with newlines, and print the message
+			return message.channel.send(results.join('\n\n'));
 		}
+		
+		async whereIsAll(message) {
+			const locations = await this.getSetting(message.member, '-location') || {};
+			const summary = [];
+			const markers = [];
+			
+			Object.keys(locations).forEach(id => {
+				const country = locations[id].country || 'Unknown';
+				const theCountry = summary.find(s => s.country === country);
+				if(theCountry) {
+					theCountry.count++;
+				} else {
+					summary.push({ country, count: 1 });
+				}
 
-		plHandleLeave(member) {
-			return this.manageLocationList(member);
-		}  */
+				let color = message.member.guild.members.get(id).displayHexColor;
+				color = color.replace(/^#/,'');
+				if(color === '000000') {
+					color = '7289DA';
+				}
+				markers.push(`size:tiny%7Ccolor:0x${color.toUpperCase()}%7C${locations[id].latitude},${locations[id].longitude}`);
+			});
+			
+			summary.sort((a,b) => a.country.localeCompare(b.country));
+			const result = summary.map(s => `**${s.country}:** ${s.count} member${s.count > 1 ? 's' : ''}`).join('\n')
+				|| 'Nobody has saved their locations yet!';
+			
+			const markerStr = markers.map(m => `&markers=${m}`).join('');
+			const gmap = `https://maps.googleapis.com/maps/api/staticmap?center=0,0&scale=2&zoom=1&size=600x380${markerStr}`;
+			const crc = crc32(markerStr).toString(16);
+			
+			return message.channel.send(result, new BotBase.Discord.Attachment(gmap,`map${crc}.png`));
+		}
+		
+		async plHandleLeave(member) {
+			const serverSettings = await this.getSetting(member, '-location') || {};
+			delete serverSettings[member.id];
+			return this.saveSetting(member, '-location', serverSettings, true);
+		}
 
 		static async LookupLocation(place) {
 			const result = JSON.parse(await pr('https://maps.googleapis.com/maps/api/geocode/json?address=' + encodeURIComponent(place)));
@@ -323,34 +212,10 @@ module.exports = (BotBase) =>
 			}
 
 			return {
-				lat: firstResult.geometry.location.lat,
-				lon: firstResult.geometry.location.lng,
+				latitude: firstResult.geometry.location.lat,
+				longitude: firstResult.geometry.location.lng,
 				city, province, country,
 				formatted: [city,province,country].filter(i => i).join(', ')
 			};
 		}
-
-		/*
-		static getLocationDifference(zone1, zone2) {
-			const now = moment.utc();
-			// get the zone offsets for this time, in minutes
-			const offset1 = moment.tz.zone(zone1).offset(now);
-			const offset2 = moment.tz.zone(zone2).offset(now);
-			// calculate the difference in hours
-			const hrDiff = (offset1 - offset2) / 60;
-			const fmtDiff = Math.abs(hrDiff).toFixed(2).replace(/\.([1-9]+)0+$/,'.$1').replace(/\.0+$/, '');
-
-			let comparison = 'the same as';
-			if(hrDiff !== 0) {
-				comparison = ((hrDiff < 0) ? 'ahead of' : 'behind');
-			}
-
-			return {
-				difference: hrDiff,
-				formatted: fmtDiff,
-				plural: Math.abs(hrDiff) === 1 ? 'hour' : 'hours',
-				comparison: comparison
-			};
-		}
-		*/
 	};

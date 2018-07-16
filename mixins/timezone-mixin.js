@@ -71,45 +71,53 @@ class TimezoneMixin extends BotBase {
 		this.bot.on('guildMemberRemove', this.tzHandleLeave.bind(this));
 	}
 
-	command__tz(params, message) {
+	async command__tz(params, message) {
 		if(/^\s*$/.test(params)) {
 			return this.fail(message);
 		}
 
-		// Look up their timezone
-		return TimezoneMixin.LookupTimezone(params)
-		.then((result) => {
-			// Update global timezone list
-			return this.manageTimezoneList(message.member, result)
-			.then(() => {
-				// Save the individual user's setting
-				return this.saveSetting(message.member, true, result);
-			})
-			.then(() => {
-				// Let them know what we found
-				const reply = 'I’ll remember your info, so you’ll never be late!\n\n' +
-					`**Your time zone:** ${result.timezone}\n` +
-					`**Your local time:** ${moment().tz(result.timezone).format('h:mma z')}`;
-
-				message.channel.send(reply);
-			});
-		})
-		.catch(NoResultError, (err) => {
-			message.channel.send(err.message);
-		});
+		try {
+			// Look up their timezone
+			const { timezone } = await TimezoneMixin.LookupTimezone(params);
+			
+			// Update server-wide counts
+			await this.manageTimezoneList(message.member, { timezone });
+			
+			// Get the existing settings
+			const userSetting = await this.getSetting(message.member, true) || {};
+			userSetting.timezone = timezone;
+			
+			// Save the time zone
+			await this.saveSetting(message.member, true, userSetting, true);
+			
+			// Let them know what we found
+			const format = userSetting && userSetting.timeFormat === '24h' ? 'HH:mm z' : 'h:mma z';
+			const reply = 'I’ll remember your info, so you’ll never be late!\n\n' +
+				`**Your time zone:** ${timezone}\n` +
+				`**Your local time:** ${moment().tz(timezone).format(format)}`;
+			
+			message.channel.send(reply);
+		} catch(err) {
+			if(err instanceof NoResultError) {
+				return message.channel.send(err.message);
+			}
+			throw err;
+		}
 	}
 
-	command__tzDelete(params, message) {
-		return this.manageTimezoneList(message.member)
-		.then(() => {
-			// Delete the saved data
-			return this.saveSetting(message.member, true, null, true)
-			.then(() => {
-				// Let the user know
-				const reply = 'Poof! Your data is forgotten.';
-				message.channel.send(reply);
-			});
-		});
+	async command__tzDelete(params, message) {
+		// Update server-wide counts
+		await this.manageTimezoneList(message.member);
+		
+		// Get the user's timezone, and delete it
+		const userData = this.getSetting(message.member, true);
+		delete userData.timezone;
+		
+		// Delete the saved data
+		await this.saveSetting(message.member, true, userData, true);
+		
+		// Let the user know
+		return message.channel.send('Poof! Your data is forgotten.');
 	}
 
 	async command__whenIs(params, message) {
@@ -185,58 +193,62 @@ class TimezoneMixin extends BotBase {
 		return message.channel.send(results.join('\n\n'));
 	}
 
-	whenisAll(message) {
-		return this.getSetting(message.member, '-timezones')
-		.then((data) => {
-			const result = [];
-			const timeMap = [];
+	async whenisAll(message) {
+		const data = await this.getSetting(message.member,'-timezones') || {};
+		const myData = await this.getSetting(message.member, true);
+		const format = myData && myData.timeFormat === '24h' ? 'HH:mm' : 'h:mma';
+		
+		const result = [];
+		const timeMap = [];
 
-			// Group same times together, even if they're not in the same timezone
-			Object.keys(data).forEach((timezone) => {
-				const userData = data[timezone];
-				const timeKey = moment().tz(timezone).format('Hmm');
-				const timeData = timeMap.find((o) => o.key === timeKey);
-				if(timeData) {
-					timeData.users = timeData.users.concat(userData.users);
-					timeData.count += userData.count;
-				} else {
-					timeMap.push({
-						key: timeKey,
-						time: moment().tz(timezone).format('h:mma'),
-						users: userData.users,
-						count: userData.count
-					});
-				}
-			});
-
-			timeMap.sort((a,b) => (+a.key) - (+b.key));
-
-			timeMap.forEach((timeEntry) => {
-				const entryNames = timeEntry.users.slice(0,50);
-				let resultMessage = '**' + timeEntry.time + ':** '
-					+ (entryNames.map(u => message.guild.members.get(u))
-					.filter(u => !!u).map(u => u.displayName).join(', '));
-
-				if(entryNames.length !== timeEntry.count) {
-					resultMessage += ' …and ' + (timeEntry.count - entryNames.length) + ' more';
-				}
-
-				result.push(resultMessage);
-			});
-
-			return result;
-		})
-		.then((results) => {
-			message.channel.send(results.join('\n\n'));
+		// Group same times together, even if they're not in the same timezone
+		Object.keys(data).forEach((timezone) => {
+			const userData = data[timezone];
+			const timeKey = moment().tz(timezone).format('Hmm');
+			const timeData = timeMap.find((o) => o.key === timeKey);
+			if(timeData) {
+				timeData.users = timeData.users.concat(userData.users);
+				timeData.count += userData.count;
+			} else {
+				timeMap.push({
+					key: timeKey,
+					time: moment().tz(timezone).format(format),
+					users: userData.users,
+					count: userData.count
+				});
+			}
 		});
+
+		timeMap.sort((a,b) => (+a.key) - (+b.key));
+
+		timeMap.forEach((timeEntry) => {
+			const entryNames = timeEntry.users.slice(0,50);
+			let resultMessage = '**' + timeEntry.time + ':** '
+				+ (entryNames.map(u => message.guild.members.get(u))
+				.filter(u => !!u).map(u => u.displayName).join(', '));
+
+			if(entryNames.length !== timeEntry.count) {
+				resultMessage += ' …and ' + (timeEntry.count - entryNames.length) + ' more';
+			}
+
+			result.push(resultMessage);
+		});
+		
+		if(result.length) {
+			message.channel.send(result.join('\n\n'));
+		} else {
+			message.channel.send('Nobody has saved their time zone yet!');
+		}
+		
 	}
 
 	static whenIsMessage(user, theirData, myData) {
+		const format = myData && myData.timeFormat === '24h' ? 'HH:mm z' : 'h:mma z';
 		if(theirData.isBot) {
 			const time = BOT_TIMEZONE[Math.floor(Math.random() * BOT_TIMEZONE.length)];
 			return `**${user.displayName}:** Their local time ${time}`;
 		} else if (myData && myData.timezone && myData.user !== theirData.user) {
-			let result = `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`;
+			let result = `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format(format)}.`;
 			const diff = TimezoneMixin.getTimezoneDifference(theirData.timezone, myData.timezone);
 
 			if (diff.difference === 0) {
@@ -246,9 +258,9 @@ class TimezoneMixin extends BotBase {
 			}
 			return result;
 		} else if (myData && myData.user === theirData.user) {
-			return `**${user.displayName}:** Your local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`
+			return `**${user.displayName}:** Your local time is ${moment().tz(theirData.timezone).format(format)}.`
 		} else {
-			return `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format('h:mma z')}.`;
+			return `**${user.displayName}:** Their local time is ${moment().tz(theirData.timezone).format(format)}.`;
 		}
 	}
 
