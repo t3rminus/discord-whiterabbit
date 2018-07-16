@@ -4,6 +4,8 @@ const pr = require('request-promise'),
 	Bluebird = require('bluebird'),
 	Misc = require('../lib/misc');
 
+const GKEY = encodeURIComponent(process.env.GOOGLE_API_KEY);
+
 const unixTimestamp = function(date) {
 	date = date || new Date();
 	// date.getTime in MS, | 0 truncates integer
@@ -316,7 +318,8 @@ class TimezoneMixin extends BotBase {
 
 	static LookupTimezone(place) {
 		let address, location;
-		return pr('https://maps.googleapis.com/maps/api/geocode/json?address=' + encodeURIComponent(place))
+		const lookupURL = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(place)}&key=${GKEY}`;
+		return pr(lookupURL)
 		.then(JSON.parse)
 		.then((result) => {
 			if (result.status !== 'OK' || !result.results || !result.results[0]) {
@@ -326,12 +329,13 @@ class TimezoneMixin extends BotBase {
 			result = result.results[0];
 			address = result.formatted_address;
 			location = result.geometry.location;
-
-			const curTime = unixTimestamp();
-			return pr('https://maps.googleapis.com/maps/api/timezone/json?timestamp=' +
-				encodeURIComponent(curTime) + '&location=' +
-				encodeURIComponent(location.lat) + ',' + encodeURIComponent(location.lng))
-
+			
+			const lat = encodeURIComponent(location.lat);
+			const lng = encodeURIComponent(location.lng);
+			const curTime = encodeURIComponent(unixTimestamp());
+			const lookupURL = `https://maps.googleapis.com/maps/api/timezone/json?timestamp=${curTime}&location=${lat},${lng}&key=${GKEY}`;
+			
+			return pr(lookupURL)
 			.then(JSON.parse)
 			.then((tzResult) => {
 				if (!tzResult || tzResult.status !== 'OK' || !tzResult.timeZoneId) {

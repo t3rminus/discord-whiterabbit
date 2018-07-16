@@ -6,11 +6,8 @@ const pr = require('request-promise'),
 	{ crc32 } = require('crc'),
 	Misc = require('../lib/misc');
 
-const unixTimestamp = function(date) {
-	date = date || new Date();
-	// date.getTime in MS, | 0 truncates integer
-	return (date.getTime() / 1000) | 0;
-};
+
+const GKEY = encodeURIComponent(process.env.GOOGLE_API_KEY);
 
 const birmingham = { latitude: 52.4774169, longitude: -1.9336706 };
 
@@ -189,7 +186,7 @@ module.exports = (BotBase) =>
 				|| 'Nobody has saved their locations yet!';
 			
 			const markerStr = markers.map(m => `&markers=${m}`).join('');
-			const gmap = `https://maps.googleapis.com/maps/api/staticmap?center=0,0&scale=2&zoom=1&size=600x380${markerStr}`;
+			const gmap = `https://maps.googleapis.com/maps/api/staticmap?center=0,0&scale=2&zoom=1&size=600x380${markerStr}&key=${GKEY}`;
 			const crc = crc32(markerStr).toString(16);
 			
 			return message.channel.send(result, new BotBase.Discord.Attachment(gmap,`map${crc}.png`));
@@ -202,7 +199,8 @@ module.exports = (BotBase) =>
 		}
 
 		static async LookupLocation(place) {
-			const result = JSON.parse(await pr('https://maps.googleapis.com/maps/api/geocode/json?address=' + encodeURIComponent(place)));
+			const lookupUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(place)}&key=${GKEY}`;
+			const result = JSON.parse(await pr(lookupUrl));
 			if (result.status !== 'OK' || !result.results || !result.results[0]) {
 				throw new NoResultError('Could not find that location');
 			}
