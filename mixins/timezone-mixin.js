@@ -198,7 +198,7 @@ class TimezoneMixin extends BotBase {
 	async whenisAll(message) {
 		const data = await this.getSetting(message.member,'-timezones') || {};
 		const myData = await this.getSetting(message.member, true);
-		const format = myData && myData.timeFormat === '24h' ? 'HH:mm' : 'h:mma';
+		const format = myData && myData.timeFormat === '24h' ? 'ddd HH:mm' : 'ddd h:mma';
 		
 		const result = [];
 		const timeMap = [];
