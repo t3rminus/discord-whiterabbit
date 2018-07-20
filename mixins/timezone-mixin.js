@@ -206,7 +206,7 @@ class TimezoneMixin extends BotBase {
 		// Group same times together, even if they're not in the same timezone
 		Object.keys(data).forEach((timezone) => {
 			const userData = data[timezone];
-			const timeKey = moment().tz(timezone).format('Hmm');
+			const timeKey = moment().tz(timezone).format('YYYYDDDDHmm');
 			const timeData = timeMap.find((o) => o.key === timeKey);
 			if(timeData) {
 				timeData.users = timeData.users.concat(userData.users);
