@@ -37,10 +37,10 @@ module.exports = (BotBase) => {
 				if(CharacterTemplates[message.content]) {
 					track.character.template = message.content;
 					track.stats = Object.keys(CharacterTemplates[message.content].stats);
-					return message.author.sendMessage(`Got it! I’ll keep track of their ` +
+					return message.author.send(`Got it! I’ll keep track of their ` +
 						`${CharacterTemplates[message.content].game} stats.`).then(() => true);
 				} else if(isSkip(message) || isSkip(message, 'none')) {
-					return message.author.sendMessage(`Got it! I’ll keep track of their free form stats.`)
+					return message.author.send(`Got it! I’ll keep track of their free form stats.`)
 					.then(() => true);
 				} else {
 					throw new Error(`Hmm... I’m not quite sure what you mean.`);
@@ -67,7 +67,7 @@ module.exports = (BotBase) => {
 					}
 					
 					track.character.name = name;
-					return message.author.sendMessage(`Okay! Their name is ${name}!`)
+					return message.author.send(`Okay! Their name is ${name}!`)
 					.then(() => true);
 				});
 			},
@@ -84,11 +84,11 @@ module.exports = (BotBase) => {
 			},
 			process: function(track, message, bot) {
 				if(isSkip(message) || isSkip(message,'no')) {
-					return message.author.sendMessage(`Moving right along!`)
+					return message.author.send(`Moving right along!`)
 					.then(() => true);
 				} else {
 					track.character.description = bot.sanitize(message.content, track.server);
-					return message.author.sendMessage(`Wonderful!`)
+					return message.author.send(`Wonderful!`)
 					.then(() => true);
 				}
 			}
@@ -101,7 +101,7 @@ module.exports = (BotBase) => {
 			},
 			process: function(track, message) {
 				if(isSkip(message) || isSkip(message,'no')) {
-					return message.author.sendMessage(`No picture? That’s too bad, but you can always add it later.`)
+					return message.author.send(`No picture? That’s too bad, but you can always add it later.`)
 					.then(() => true);
 				} else {
 					let image;
@@ -112,7 +112,7 @@ module.exports = (BotBase) => {
 					}
 					
 					track.character.image = image.url;
-					return message.author.sendMessage(`Wow! Now I know what ${track.character.name} looks like.`)
+					return message.author.send(`Wow! Now I know what ${track.character.name} looks like.`)
 					.then(() => true);
 				}
 			}
@@ -130,10 +130,10 @@ module.exports = (BotBase) => {
 			},
 			process: function(track, message, bot) {
 				if(isSkip(message)) {
-					return message.author.sendMessage(`Okay! Skipping this for now.`)
+					return message.author.send(`Okay! Skipping this for now.`)
 					.then(() => 'stat');
 				} else if(isSkip(message,'done')) {
-					return message.author.sendMessage(`Alright, done with info.`)
+					return message.author.send(`Alright, done with info.`)
 					.then(() => 'stat');
 				} else {
 					track.nextInfo = bot.sanitize(message.content, track.server);
@@ -152,12 +152,12 @@ module.exports = (BotBase) => {
 				delete track.nextInfo;
 				
 				if(isSkip(message)) {
-					return message.author.sendMessage(`Got it! Next!`)
+					return message.author.send(`Got it! Next!`)
 					.then(() => 'stat');
 				}
 				
 				track.character[info] = bot.sanitize(message.content, track.server);
-				return message.author.sendMessage(`Good! Noted.`)
+				return message.author.send(`Good! Noted.`)
 				.then(() => 'info');
 			}
 		},
@@ -182,7 +182,7 @@ module.exports = (BotBase) => {
 			process: function(track, message, bot) {
 				if(isSkip(message)) {
 					track.stats.shift();
-					return message.author.sendMessage(`Okay. You can set that later.`)
+					return message.author.send(`Okay. You can set that later.`)
 					.then(() => 'stat');
 				}
 				
@@ -200,10 +200,10 @@ module.exports = (BotBase) => {
 						if(calcVal > 0) {
 							calcVal = `+${calcVal}`;
 						}
-						return message.author.sendMessage(`Okay. ${game.stats[track.curStat].name} is ${stat}` +
+						return message.author.send(`Okay. ${game.stats[track.curStat].name} is ${stat}` +
 							` which is ${calcVal}`);
 					} else {
-						return message.author.sendMessage(`Okay. ${game.stats[track.curStat].name} is ${stat}`);
+						return message.author.send(`Okay. ${game.stats[track.curStat].name} is ${stat}`);
 					}
 				})
 				.then(() => {
@@ -235,7 +235,7 @@ module.exports = (BotBase) => {
 					}
 					
 					track.character.name = name;
-					return message.author.sendMessage(`Nice to meet you, ${name}!`)
+					return message.author.send(`Nice to meet you, ${name}!`)
 					.then(() => 99); // End
 				});
 			}
@@ -374,7 +374,7 @@ module.exports = (BotBase) => {
 			});
 
 			return Bluebird.try(() => {
-				return message.author.sendMessage(`Hello! You wanted to set up a character on the ${message.guild.name} server? ` +
+				return message.author.send(`Hello! You wanted to set up a character on the ${message.guild.name} server? ` +
 					`What fun! I’ll walk you through the process. If you want to cancel at anytime, just ` +
 					`yell \`ABORT\`, and I’ll forget this ever happened. You can also skip any questions by saying ` +
 					`\`skip\`. Just so you know, you’re able to change any info about your character at any time, so ` +
@@ -384,7 +384,7 @@ module.exports = (BotBase) => {
 			.then(() => {
 				const step = walkthroughSteps[track.step];
 				return Bluebird.resolve(step.open(track, message)).then((text) => {
-					return message.author.sendMessage(text);
+					return message.author.send(text);
 				});
 			});
 		}
@@ -399,7 +399,7 @@ module.exports = (BotBase) => {
 				if(message.content === 'ABORT') {
 					clearTimeout(track.timeout);
 					delete this.walkthroughTracker[message.author.id];
-					return message.author.sendMessage(`Abort! Sorry things didn’t work out.`);
+					return message.author.send(`Abort! Sorry things didn’t work out.`);
 				}
 
 				return this.walkthroughStep(track, message);
@@ -442,21 +442,21 @@ module.exports = (BotBase) => {
 						return Bluebird.resolve(open(track, message, this))
 						.then((text) => {
 							track.ready = true;
-							return message.author.sendMessage(text);
+							return message.author.send(text);
 						});
 					} else {
 						return this.saveCharacter(track.character, {member: track.member, author: {id: track.user}})
 						.then((character) => {
 							clearTimeout(track.timeout);
 							delete this.walkthroughTracker[message.author.id];
-							return message.author.sendMessage(`Terrific! I’ve set you up to play ` +
+							return message.author.send(`Terrific! I’ve set you up to play ` +
 								`as ${character.name}. I hope you have lots of fun!`)
 								.then(() => {
 									return this.renderSheet(character, { displayName: 'you'}, message);
 								});
 						})
 						.catch(ExistingCharacter, () => {
-							return message.author.sendMessage(`Well, this is really embarrassing. Before I could ` +
+							return message.author.send(`Well, this is really embarrassing. Before I could ` +
 								`save your character, it seems someone else created one with a similar name.`)
 							.then(() => {
 								track.step = walkthroughSteps.findIndex(s => s.step === 'emergency_name');
@@ -464,13 +464,13 @@ module.exports = (BotBase) => {
 								return Bluebird.resolve(step.open(track, message, this))
 								.then((text) => {
 									track.ready = true;
-									return message.author.sendMessage(text);
+									return message.author.send(text);
 								});
 							});
 						})
 						.catch((err) => {
 							console.log(err);
-							return message.author.sendMessage(`Well, this is really embarrassing. Something ` +
+							return message.author.send(`Well, this is really embarrassing. Something ` +
 								`strange just happened. Would you mind repeating that?`);
 						});
 					}
@@ -479,25 +479,25 @@ module.exports = (BotBase) => {
 					return Bluebird.resolve(retry(track, message, this))
 					.then((text) => {
 						track.ready = true;
-						return message.author.sendMessage(text);
+						return message.author.send(text);
 					});
 				}
 			})
 			.catch(err => {
-				return Bluebird.resolve(message.author.sendMessage(err.message))
+				return Bluebird.resolve(message.author.send(err.message))
 					.delay(500)
 					.then(() => {
 						if(step.step !== 'name') {
-							return message.author.sendMessage(`Let’s try this one more time. If you want, just say \`skip\` and we can move on.`);
+							return message.author.send(`Let’s try this one more time. If you want, just say \`skip\` and we can move on.`);
 						} else {
-							return message.author.sendMessage(`Let’s try this one more time.`);
+							return message.author.send(`Let’s try this one more time.`);
 						}
 					})
 					.then(() => {
 						return Bluebird.resolve(step.open(track, message, this))
 							.then((text) => {
 								track.ready = true;
-								return message.author.sendMessage(text);
+								return message.author.send(text);
 							});
 					});
 			});
