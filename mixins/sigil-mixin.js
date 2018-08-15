@@ -16,7 +16,7 @@ module.exports = (BotBase) =>
 		}
 		
 		async command__sigil(params, message) {
-			const fn = params.replace(/[^a-z]+/g,'_').replace(/(^_+|_+$)/g, '');
+			const fn = params.replace(/[^a-z0-9]+/g,'_').replace(/(^_+|_+$)/g, '') || 'unknown';
 			
 			await message.channel.send(new BotBase.Discord.Attachment(`${SIGIL_API}${encodeURIComponent(params)}`, `${fn}.png`));
 			return message.delete();

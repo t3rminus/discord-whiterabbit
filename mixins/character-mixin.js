@@ -54,8 +54,9 @@ module.exports = (BotBase) => {
 				return `What is your character’s name?`;
 			},
 			process: function(track, message, bot) {
-				if(isSkip(message)) {
-					throw new Error('Sorry, this is the one thing I can’t skip.');
+				if(isSkip(message) && !track.skipCount) {
+					track.skipCount = true;
+					throw new Error(`Sorry, this is the one thing I can’t skip. If you actually want to name your character "${message}", just type it one more time.`);
 				}
 				const name = bot.sanitize(message.content, track.server);
 				return bot.findCharacter(name, {member: track.member}, CharacterNameDistance)
