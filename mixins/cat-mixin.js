@@ -139,7 +139,7 @@ module.exports = (BotBase) =>
 		
 		reactionValue(emoji) {
 			const negativeReactions = ['👎','🛑','⛔','🚫','❌','🤬','💢','💀','☠'];
-			const positiveReactions = ['👍','👌','✅','❤','🧡','💛','💚','💙','💜','⬆','🤩','😻'];
+			const positiveReactions = ['👍','👌','✅','❤','🧡','💛','💚','💙','💜','⬆','🤩','😻','💯'];
 			
 			const emojiValue = (emoji && emoji.name) || emoji;
 			if(negativeReactions.includes(emojiValue)) {
