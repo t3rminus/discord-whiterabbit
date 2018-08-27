@@ -1,16 +1,27 @@
 'use strict';
-const Bluebird = require('bluebird'),
+const Misc = require('../lib/misc'),
 	pr = require('request-promise'),
+	{ extname } = require('path'),
 	Jimp = require('jimp');
 
-const butt = Jimp.read('images/cat_butt.png'),
-	head = Jimp.read('images/cat_head.png'),
-	fuzz = Jimp.read('images/cat_fuzz.png');
+const buttSRC = Jimp.read('images/cat_butt.png'),
+	headSRC = Jimp.read('images/cat_head.png'),
+	fuzzSRC = Jimp.read('images/cat_fuzz.png');
 
 const boiHeight = 60;
 
-const MEOW_API = 'http://thecatapi.com/api/images/get';
-const WOOF_API = 'https://random.dog/woof';
+const APIS = {
+	cat: {
+		uri: 'https://api.thecatapi.com/v1/images/search',
+		votes: 'https://api.thecatapi.com/v1/votes',
+		key: process.env.CAT_API_KEY
+	},
+	dog: {
+		uri: 'https://api.thedogapi.com/v1/images/search',
+		votes: 'https://api.thedogapi.com/v1/votes',
+		key: process.env.DOG_API_KEY
+	}
+};
 
 module.exports = (BotBase) =>
 	class CatMixin extends BotBase {
@@ -36,9 +47,10 @@ module.exports = (BotBase) =>
 			};
 
 			this.addHandler(this.isACat);
+			this.bot.on('messageReactionAdd', this.reactionAdded.bind(this));
 		}
 
-		command__longcat(params, message) {
+		async command__longcat(params, message) {
 			if(!params._ || !params._[0] || isNaN(+params._[0])) {
 				return this.fail(message);
 			}
@@ -46,83 +58,136 @@ module.exports = (BotBase) =>
 			longboi = longboi > 20 ? 20 : longboi;
 			longboi = longboi <= 1 ? 1 : longboi;
 
-			return Bluebird.all([butt, head, fuzz])
-				.then(([butt, head, fuzz]) => {
-					const cat = Math.floor(Math.random() * (head.bitmap.height / boiHeight)) * boiHeight;
+			const [butt, head, fuzz] = await Promise.all([buttSRC, headSRC, fuzzSRC]);
+			const cat = Math.floor(Math.random() * (head.bitmap.height / boiHeight)) * boiHeight;
+			const newImage = await CatMixin.newImage(butt.bitmap.width + head.bitmap.width + (fuzz.bitmap.width * longboi), boiHeight, 0x00000000);
 
-					return CatMixin.newImage(butt.bitmap.width + head.bitmap.width + (fuzz.bitmap.width * longboi), boiHeight, 0x00000000)
-						.then(newImage => {
-							newImage.blit(butt,0,0,0,cat,butt.bitmap.width,boiHeight);
-							for(let i = 0; i < longboi; i++) {
-								newImage.blit(fuzz, butt.bitmap.width + (fuzz.bitmap.width * i), 0, 0, cat, fuzz.bitmap.width, boiHeight);
-							}
-							newImage.blit(head, butt.bitmap.width + (fuzz.bitmap.width * longboi), 0, 0, cat, head.bitmap.width, boiHeight);
-
-							return Bluebird.fromCallback(cb => newImage.getBuffer(Jimp.MIME_PNG, cb));
-						});
-				})
-				.then(imgBuffer => {
-					return message.channel.send(new BotBase.Discord.Attachment(imgBuffer, 'cat.png'));
-				});
+			newImage.blit(butt,0,0,0,cat,butt.bitmap.width,boiHeight);
+			for(let i = 0; i < longboi; i++) {
+				newImage.blit(fuzz, butt.bitmap.width + (fuzz.bitmap.width * i), 0, 0, cat, fuzz.bitmap.width, boiHeight);
+			}
+			newImage.blit(head, butt.bitmap.width + (fuzz.bitmap.width * longboi), 0, 0, cat, head.bitmap.width, boiHeight);
+			
+			const imgBuffer = await newImage.getBufferAsync(Jimp.MIME_PNG);
+			return this.sendReply(message, new BotBase.Discord.Attachment(imgBuffer, `cat_${Misc.unixTimestamp()}.png`));
+		}
+		
+		async getPet(message, kind) {
+			if(!APIS[kind]) {
+				throw new Error('Unknown pet kind');
+			}
+			
+			const request = {
+				uri: APIS[kind].uri,
+				qs: {
+					size: 'med',
+					format: 'json',
+					order: 'RANDOM',
+					page: 0,
+					limit: 1
+				},
+				headers: {
+					'Content-type': 'application/json',
+					'x-api-key': APIS[kind].key
+				},
+				json: true
+			};
+			
+			const [ pet ] = await pr(request);
+			const attachmentName = `${kind}__${pet.id}__${extname(pet.url)}`;
+			return this.sendReply(message, new BotBase.Discord.Attachment(pet.url, attachmentName));
 		}
 
 		command__meow(params, message) {
-			let result;
-			if(process.env.CAT_API_KEY) {
-				if(MEOW_API.indexOf('?') >= 0) {
-					result = pr.get(`${MEOW_API}&api_key=${process.env.CAT_API_KEY}`, { followRedirect: false });
-				} else {
-					result = pr.get(`${MEOW_API}?api_key=${process.env.CAT_API_KEY}`, { followRedirect: false });
+			return this.getPet(message, 'cat');
+		}
+
+		command__woof(params, message) {
+			return this.getPet(message, 'dog');
+		}
+		
+		async reactionAdded(messageReaction, user) {
+			const { message, message: { attachments, author } = {}, emoji } = messageReaction;
+			const reactionVal = this.reactionValue(emoji);
+			const { kind, id } = this.petAttachmentDetails(attachments);
+			
+			if(author.id === this.bot.user.id && reactionVal !== null && APIS[kind] && APIS[kind].votes) {
+				const request = {
+					method: 'POST',
+					uri: APIS[kind].votes,
+					body: {
+						image_id: id,
+						value: reactionVal,
+						sub_id: user.id
+					},
+					headers: {
+						'Content-type': 'application/json',
+						'x-api-key': APIS[kind].key
+					},
+					json: true
+				};
+				try {
+					const response = await pr(request);
+					if(response.message === 'SUCCESS' && reactionVal === false) {
+						return message.delete();
+					}
+				} catch(err) {
+					return this.sendReply('Oh dear. I tried to register your reaction, but something went wrong. Do try again!');
 				}
-			} else {
-				result = pr.get(MEOW_API, { followRedirect: false });
 			}
-
-			return result
-				.catch(err => {
-					if(err.statusCode === 302 && err.response && err.response.headers && err.response.headers.location) {
-						return err.response.headers.location;
-					}
-					throw err;
-				})
-				.then((file) => {
-					return message.channel.send(new BotBase.Discord.Attachment(file, file));
-				});
 		}
-
-		command__woof(params, message, count) {
-			if(count && count > 5) {
-				return message.channel.send('Good heavens! I’m having a bit of trouble getting a doggo for you right now!');
+		
+		reactionValue(emoji) {
+			const negativeReactions = ['👎','🛑','⛔','🚫','❌','🤬','💢','💀','☠'];
+			const positiveReactions = ['👍','👌','✅','❤','🧡','💛','💚','💙','💜','⬆','🤩','😻'];
+			
+			const emojiValue = (emoji && emoji.name) || emoji;
+			if(negativeReactions.includes(emojiValue)) {
+				return false;
+			} else if(positiveReactions.includes(emojiValue)) {
+				return true;
 			}
-			return pr.get(WOOF_API)
-				.then(file => {
-					if(/\.jpe?g$/i.test(file)) {
-						return message.channel.send(new BotBase.Discord.Attachment(`https://random.dog/${file}`, file));
-					} else {
-						return this.command__woof(params, message, count ? count + 1 : 1);
-					}
-				});
+			
+			return null;
 		}
-
-		isACat(message) {
+		
+		petAttachmentDetails(attachments) {
+			try {
+				const [[,attachment] = []] = attachments;
+				const details = /([a-z]+)__([a-z0-9]+)__\.(jpg|jpeg|png|gif)/.exec(attachment.filename);
+				if(details && details.length === 4) {
+					return {
+						kind: details[1],
+						id: details[2]
+					};
+				}
+			} catch(err) { }
+			return null;
+		}
+		
+		async isACat(message) {
 			if(message.member && message.member.id !== this.bot.user.id) {
-				this.getServerSettings(message)
-				.then((settings) => {
-					const prefix = settings.prefix || '?';
-					// Match command at beginning of message
-					const matchCmd = new RegExp(`^${BotBase.Misc.escapeRegex(prefix)}c(a+)t(\s*|$)`);
-					const match = matchCmd.exec(message.content);
-
-					if(match && match.length && match[1]) {
-						return this.command__longcat({'_':[match[1].length]}, message);
-					}
-				});
+				const settings = await this.getServerSettings(message);
+				const prefix = settings.prefix || '?';
+				
+				// Match command at beginning of message
+				const matchCmd = new RegExp(`^${BotBase.Misc.escapeRegex(prefix)}c(a+)t(\s*|$)`);
+				const match = matchCmd.exec(message.content);
+				
+				if(match && match.length && match[1]) {
+					return this.command__longcat({'_':[match[1].length]}, message);
+				}
 			}
 		}
 
 		static newImage(w, h, color) {
-			return Bluebird.fromCallback(cb => {
-				new Jimp(w, h, color, cb);
+			return new Promise((resolve, reject) => {
+				new Jimp(w, h, color, (err, image) => {
+					if(err) {
+						return reject(err);
+					}
+					return resolve(image);
+				});
 			});
 		}
 	};

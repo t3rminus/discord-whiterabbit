@@ -30,7 +30,7 @@
     "fuzzy-matching": "^0.4.3",
     "geolib": "^2.0.24",
     "ioredis": "^3.2.1",
-    "jimp": "^0.2.28",
+    "jimp": "^0.3.7",
     "mixwith": "^0.1.1",
     "moment-timezone": "^0.5.13",
     "node-schedule": "^1.2.5",
