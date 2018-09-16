@@ -108,13 +108,13 @@ module.exports = (BotBase) =>
 				} else {
 					const list = settings.allowroles[group].list.map((value) => `\n • ${value}`).join('');
 					const output = `Okay. Users can select from the following roles `
-						+ `with the ${prefix}${group} command.\n${list}`;
+						+ `with the \`${prefix}${group}\` command.\n${list}`;
 					return this.sendReply(message, output);
 				}
 			} else {
 				const list = settings.allowroles[group].list.map((value) => `\n • ${value}`).join('');
 				const output = `Users can select from the following roles `
-					+ `in ${group} with the ${prefix}${group} command.\n${list}`;
+					+ `with the \`${prefix}${group}\` command.\n${list}`;
 				return this.sendReply(message, output);
 			}
 		}
