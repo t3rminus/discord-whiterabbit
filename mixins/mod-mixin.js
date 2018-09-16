@@ -106,15 +106,15 @@ module.exports = (BotBase) =>
 					return this.sendReply(message, `Okay. I won't let users assign themselves `
 						+ `a role with ${prefix}${group}.`);
 				} else {
-					const list = settings.allowroles[group].list.map((value) => `\n\n • ${value}`).join('');
+					const list = settings.allowroles[group].list.map((value) => `\n • ${value}`).join('');
 					const output = `Okay. Users can select from the following roles `
-						+ `with the ${prefix}${group} command.${list}`;
+						+ `with the ${prefix}${group} command.\n${list}`;
 					return this.sendReply(message, output);
 				}
 			} else {
-				const list = settings.allowroles[group].list.map((value) => `\n\n • ${value}`).join('');
+				const list = settings.allowroles[group].list.map((value) => `\n • ${value}`).join('');
 				const output = `Users can select from the following roles `
-					+ `in ${group} with the ${prefix}${group} command.${list}`;
+					+ `in ${group} with the ${prefix}${group} command.\n${list}`;
 				return this.sendReply(message, output);
 			}
 		}
@@ -129,13 +129,21 @@ module.exports = (BotBase) =>
 			const prefixRegEx = new RegExp(`^${Misc.escapeRegex(prefix)}`);
 			if(prefixRegEx.test(message.content)) {
 				const params = Misc.parseString(message.content.replace(prefixRegEx, ''));
-				if(params.length !== 2) {
+				if(!params.length || params.length > 2) {
 					return false;
 				}
 				const group = params.shift().toLowerCase();
 				if(!settings.allowroles[group]) {
 					return false;
 				}
+				if(!params.length) {
+					const list = settings.allowroles[group].list.map((value) => `\n • ${value}`).join('');
+					await this.sendReply(message, `You can choose a \`${prefix}${group}\` from the `
+						+ `following list:\n${list}`);
+					
+					return true;
+				}
+				
 				const role = Misc.stringNormalize(params.shift());
 				if(!role.length) {
 					return false;
