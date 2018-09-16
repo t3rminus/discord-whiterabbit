@@ -31,19 +31,22 @@ module.exports = (BotBase) =>
 			this.commands['longcat'] = {
 				helpText: 'Longcat is how long? Alias: {prefix}cat, {prefix}caat, {prefix}caaat, etc.',
 				args: ['#'],
-				method: 'command__longcat'
+				method: 'command__longcat',
+				sort: 140
 			};
 
 			this.commands['meow'] = {
 				helpText: 'Need a cat to cheer you up?',
 				args: [],
-				method: 'command__meow'
+				method: 'command__meow',
+				sort: 141
 			};
 
 			this.commands['woof'] = {
 				helpText: 'Need a pupper to cheer you up?',
 				args: [],
-				method: 'command__woof'
+				method: 'command__woof',
+				sort: 142
 			};
 
 			this.addHandler(this.isACat);
@@ -51,24 +54,25 @@ module.exports = (BotBase) =>
 		}
 
 		async command__longcat(params, message) {
-			if(!params._ || !params._[0] || isNaN(+params._[0])) {
+			if(!params[0] || isNaN(+params[0])) {
 				return this.fail(message);
 			}
-			let longboi = +params._[0];
+			let longboi = +params[0];
 			longboi = longboi > 20 ? 20 : longboi;
 			longboi = longboi <= 1 ? 1 : longboi;
 
 			const [butt, head, fuzz] = await Promise.all([buttSRC, headSRC, fuzzSRC]);
 			const cat = Math.floor(Math.random() * (head.bitmap.height / boiHeight)) * boiHeight;
 			const newImage = await CatMixin.newImage(butt.bitmap.width + head.bitmap.width + (fuzz.bitmap.width * longboi), boiHeight, 0x00000000);
-
+			
 			newImage.blit(butt,0,0,0,cat,butt.bitmap.width,boiHeight);
 			for(let i = 0; i < longboi; i++) {
 				newImage.blit(fuzz, butt.bitmap.width + (fuzz.bitmap.width * i), 0, 0, cat, fuzz.bitmap.width, boiHeight);
 			}
 			newImage.blit(head, butt.bitmap.width + (fuzz.bitmap.width * longboi), 0, 0, cat, head.bitmap.width, boiHeight);
 			
-			const imgBuffer = await newImage.getBufferAsync(Jimp.MIME_PNG);
+			const imgBuffer = await CatMixin.getImageBuffer(newImage, Jimp.MIME_PNG);
+			
 			return this.sendReply(message, new BotBase.Discord.Attachment(imgBuffer, `cat_${Misc.unixTimestamp()}.png`));
 		}
 		
@@ -111,7 +115,7 @@ module.exports = (BotBase) =>
 			const reactionVal = this.reactionValue(emoji);
 			const { kind, id } = this.petAttachmentDetails(attachments);
 			
-			if(author.id === this.bot.user.id && reactionVal !== null && APIS[kind] && APIS[kind].votes) {
+			if(kind && id && author.id === this.bot.user.id && reactionVal !== null && APIS[kind] && APIS[kind].votes) {
 				const request = {
 					method: 'POST',
 					uri: APIS[kind].votes,
@@ -154,7 +158,7 @@ module.exports = (BotBase) =>
 		petAttachmentDetails(attachments) {
 			try {
 				const [[,attachment] = []] = attachments;
-				const details = /([a-z]+)__([a-z0-9]+)__\.(jpg|jpeg|png|gif)/.exec(attachment.filename);
+				const details = /([a-z]+)__([a-z0-9]+)__\.(jpg|jpeg|png|gif)/i.exec(attachment.filename);
 				if(details && details.length === 4) {
 					return {
 						kind: details[1],
@@ -162,7 +166,7 @@ module.exports = (BotBase) =>
 					};
 				}
 			} catch(err) { }
-			return null;
+			return { kind: null, id: null };
 		}
 		
 		async isACat(message) {
@@ -175,7 +179,7 @@ module.exports = (BotBase) =>
 				const match = matchCmd.exec(message.content);
 				
 				if(match && match.length && match[1]) {
-					return this.command__longcat({'_':[match[1].length]}, message);
+					return this.command__longcat([match[1].length], message);
 				}
 			}
 		}
@@ -183,6 +187,17 @@ module.exports = (BotBase) =>
 		static newImage(w, h, color) {
 			return new Promise((resolve, reject) => {
 				new Jimp(w, h, color, (err, image) => {
+					if(err) {
+						return reject(err);
+					}
+					return resolve(image);
+				});
+			});
+		}
+		
+		static getImageBuffer(image, mime) {
+			return new Promise((resolve, reject) => {
+				image.getBuffer(mime, (err, image) => {
 					if(err) {
 						return reject(err);
 					}

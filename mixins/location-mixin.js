@@ -1,8 +1,6 @@
 'use strict';
 const pr = require('request-promise'),
-	moment = require('moment-timezone'),
 	geolib = require('geolib'),
-	Bluebird = require('bluebird'),
 	{ crc32 } = require('crc'),
 	Misc = require('../lib/misc');
 
@@ -34,14 +32,14 @@ module.exports = (BotBase) =>
 				args: ['city'],
 				method: 'command__place',
 				parseParams: false,
-				sort: 13
+				sort: 110
 			};
 
 			this.commands['placedelete'] = {
 				helpText: 'Clear your location information.',
 				method: 'command__placeDelete',
 				parseParams: false,
-				sort: 14
+				sort: 111
 			};
 
 			this.commands['whereis'] = {
@@ -49,7 +47,7 @@ module.exports = (BotBase) =>
 				args: ['name', '(…name)'],
 				method: 'command__whereIs',
 				parseParams: false,
-				sort: 15
+				sort: 112
 			};
 
 			this.bot.on('guildMemberRemove', this.plHandleLeave.bind(this));

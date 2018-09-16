@@ -885,59 +885,57 @@ module.exports = (BotBase) => {
 			params = params.filter(p => p.length && !/^\s+$/.test(p) && !/^(, ?| |; ?)$/.test(p));
 
 			// Map all the searched names to users
-			return this.findUsers(params, message)
-			.then((members) => {
-				if(!members) {
-					return this.fail(message);
-				}
+			const members = this.findUsers(params, message);
+			if(!members) {
+				return this.fail(message);
+			}
 
-				// For each member, figure out who they are and look up their info
-				return Bluebird.map(members, (member) => {
-					if(member && member.id) {
-						return this.getSetting(member)
-						.then((userData) => {
-							if(!userData) {
-								throw new Error();
-							}
+			// For each member, figure out who they are and look up their info
+			return Bluebird.map(members, (member) => {
+				if(member && member.id) {
+					return this.getSetting(member)
+					.then((userData) => {
+						if(!userData) {
+							throw new Error();
+						}
 
-							let result = '';
-							if(member.id === message.author.id) {
-								if(userData.currentCharacter) {
-									result += `You are currently playing as **${userData.currentCharacter}**.`;
-								} else {
-									result += `You are not currently playing as anyone.`;
-								}
+						let result = '';
+						if(member.id === message.author.id) {
+							if(userData.currentCharacter) {
+								result += `You are currently playing as **${userData.currentCharacter}**.`;
 							} else {
-								if(userData.currentCharacter) {
-									result += `${member.displayName} is currently playing as **${userData.currentCharacter}**.`;
-								} else {
-									result += `${member.displayName} is not currently playing as anyone.`;
-								}
+								result += `You are not currently playing as anyone.`;
 							}
-
-							const characterNames = (userData.characters || []).map(c => c.name)
-								.filter(c => c !== userData.currentCharacter);
-							if(characterNames.length) {
-								if(member.id === message.author.id) {
-									result += `\nOther characters played by you: ${characterNames.join(', ')}.`;
-								} else {
-									result += `\nOther characters played by ${member.displayName}: ${characterNames.join(', ')}.`;
-								}
+						} else {
+							if(userData.currentCharacter) {
+								result += `${member.displayName} is currently playing as **${userData.currentCharacter}**.`;
+							} else {
+								result += `${member.displayName} is not currently playing as anyone.`;
 							}
+						}
 
-							return result;
-						})
-						.catch(() => {
-							return message.channel.send(`**${member.displayName}:** An error occurred for that user.`);
-						});
-					} else {
-						return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
-					}
-				})
-				.then((results) => {
-					// Join all results with newlines, and print the message
-					message.channel.send(results.join('\n\n'));
-				});
+						const characterNames = (userData.characters || []).map(c => c.name)
+							.filter(c => c !== userData.currentCharacter);
+						if(characterNames.length) {
+							if(member.id === message.author.id) {
+								result += `\nOther characters played by you: ${characterNames.join(', ')}.`;
+							} else {
+								result += `\nOther characters played by ${member.displayName}: ${characterNames.join(', ')}.`;
+							}
+						}
+
+						return result;
+					})
+					.catch(() => {
+						return message.channel.send(`**${member.displayName}:** An error occurred for that user.`);
+					});
+				} else {
+					return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
+				}
+			})
+			.then((results) => {
+				// Join all results with newlines, and print the message
+				message.channel.send(results.join('\n\n'));
 			});
 		}
 

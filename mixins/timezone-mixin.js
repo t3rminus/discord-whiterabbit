@@ -1,7 +1,6 @@
 'use strict';
 const pr = require('request-promise'),
 	moment = require('moment-timezone'),
-	Bluebird = require('bluebird'),
 	Misc = require('../lib/misc');
 
 const GKEY = encodeURIComponent(process.env.GOOGLE_API_KEY);
@@ -52,14 +51,14 @@ class TimezoneMixin extends BotBase {
 			args: ['place'],
 			method: 'command__tz',
 			parseParams: false,
-			sort: 10
+			sort: 100
 		};
 
 		this.commands['tzdelete'] = {
 			helpText: 'Clear your time zone information.',
 			method: 'command__tzDelete',
 			parseParams: false,
-			sort: 11
+			sort: 101
 		};
 
 		this.commands['whenis'] = {
@@ -67,7 +66,7 @@ class TimezoneMixin extends BotBase {
 			args: ['name', '(…name)'],
 			method: 'command__whenIs',
 			parseParams: false,
-			sort: 12
+			sort: 102
 		};
 
 		this.bot.on('guildMemberRemove', this.tzHandleLeave.bind(this));

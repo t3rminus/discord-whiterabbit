@@ -12,92 +12,88 @@ module.exports = (BotBase) =>
 				'anywhere in a message. Add more than one "polo" to randomly select one.',
 				args: ['"marco"','"polo"','(..."polo")','(--fuzzy)','(--partial)','(--replace)'],
 				method: 'command__response',
-				adminOnly: true
+				adminOnly: true,
+				sort: 9
 			};
 
 			this.addHandler(this.msg_response);
 		}
 
-		command__response(params, message) {
-			return this.isAdmin(message).then(() => {
-				if(params._.length < 2) {
-					throw new Error('Unknown number of parameters');
-				}
-
-				return this.getServerSettings(message);
-			})
-			.then((settings) => {
-				settings.responses = settings.responses || [];
-				const marco = params._[0].toLowerCase();
-				let polo = params._[1];
-				if(params._.length > 2) {
-					polo = params._.slice(1);
-				}
-
-				if(polo === 'delete') {
-					const del = settings.responses.findIndex((i) => i.marco === marco);
-					if(del > -1) {
-						settings.responses.splice(del, 1);
-						return this.saveServerSettings(message, settings, true)
-							.then(() => {
-								return message.channel.send(`I’ve forgotten the response to "${marco}"`);
-							});
-					} else {
-						return message.channel.send(`I don’t have a response for "${marco}"`);
-					}
-				}
-
-				const existing = ResponderMixin.findResponse(settings, marco);
-				if(existing) {
-					return message.channel.send(`I'm already responding to "${marco}": "${existing.polo}"`);
-				}
-
-				settings.responses.push({
-					marco, polo,
-					fuzzy: params['fuzzy'],
-					partial: params['partial'],
-					replace: params['replace']
-				});
-
-				return this.saveServerSettings(message, settings, true)
+		async command__response(params, message) {
+			if(!(await this.isAdmin(message))) {
+				return this.fail(message);
+			}
+			if(params.length < 2) {
+				throw new Error('Unknown number of parameters');
+			}
+			const settings = await this.getServerSettings(message);
+			
+			settings.responses = settings.responses || [];
+			const marco = params[0].toLowerCase();
+			let polo = params[1];
+			if(params.length > 2) {
+				polo = params.slice(1);
+			}
+			
+			if(polo === 'delete') {
+				const del = settings.responses.findIndex((i) => i.marco === marco);
+				if(del > -1) {
+					settings.responses.splice(del, 1);
+					return this.saveServerSettings(message, settings, true)
 					.then(() => {
-						let theResp = `"${polo}"`;
-						if(Array.isArray(polo)) {
-							theResp = `one of ${polo.length} things`;
-						}
-						const replace = params['replace'];
-						if(params['fuzzy']) {
-							return message.channel.send(`Ok! When someone says something similar to "${marco}, I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
-						} else if(params['partial']) {
-							return message.channel.send(`Ok! When someone says something with "${marco}" in it, I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
-						} else {
-							return message.channel.send(`Ok! When someone says "${marco}", I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
-						}
+						return message.channel.send(`I’ve forgotten the response to "${marco}"`);
 					});
+				} else {
+					return message.channel.send(`I don’t have a response for "${marco}"`);
+				}
+			}
+			
+			const existing = ResponderMixin.findResponse(settings, marco);
+			if(existing) {
+				return message.channel.send(`I'm already responding to "${marco}": "${existing.polo}"`);
+			}
+			
+			settings.responses.push({
+				marco, polo,
+				fuzzy: params.flags.fuzzy,
+				partial: params.flags.partial,
+				replace: params.flags.replace
 			});
+
+			await this.saveServerSettings(message, settings, true);
+			
+			let theResp = `"${polo}"`;
+			if(Array.isArray(polo)) {
+				theResp = `one of ${polo.length} things`;
+			}
+			const replace = params.flags.replace;
+			if(params.flags.fuzzy) {
+				return this.sendReply(message, `Ok! When someone says something similar to "${marco}, I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
+			} else if(params.flags.partial) {
+				return this.sendReply(message, `Ok! When someone says something with "${marco}" in it, I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
+			} else {
+				return this.sendReply(message, `Ok! When someone says "${marco}", I’ll ${replace ? 'replace it with' : 'say'} ${theResp}!`);
+			}
 		}
 
-		msg_response(message) {
+		async msg_response(message) {
 			if(message.member && message.member.id !== this.bot.user.id) {
-				this.getServerSettings(message)
-				.then((settings) => {
-					const response = ResponderMixin.findResponse(settings, message.content.toLowerCase());
-					if(response) {
-						if(Array.isArray(response.polo)) {
-							const responseText = response.polo[Math.floor(Math.random() * response.polo.length)];
-							message.channel.send(responseText);
-						} else {
-							message.channel.send(response.polo);
-						}
-						if(response.replace) {
-							message.delete();
-						}
-						
-						return true;
+				const settings = await this.getServerSettings(message);
+				const response = ResponderMixin.findResponse(settings, message.content.toLowerCase());
+				if (response) {
+					if (Array.isArray(response.polo)) {
+						const responseText = response.polo[Math.floor(Math.random() * response.polo.length)];
+						this.sendReply(message, responseText);
+					} else {
+						this.sendReply(message, response.polo);
 					}
-				});
+					
+					if (response.replace) {
+						message.delete();
+					}
+					return true;
+				}
 			}
-
 			return false;
 		}
 
