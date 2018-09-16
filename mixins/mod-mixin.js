@@ -128,8 +128,8 @@ module.exports = (BotBase) =>
 			const prefix = settings.prefix || this.defaultSettings.prefix;
 			const prefixRegEx = new RegExp(`^${Misc.escapeRegex(prefix)}`);
 			if(prefixRegEx.test(message.content)) {
-				const params = Misc.parseString(message.content.replace(prefixRegEx, ''));
-				if(!params.length || params.length > 2) {
+				const params = Misc.parseString(message.content.replace(prefixRegEx, ''), 1);
+				if(!params.length) {
 					return false;
 				}
 				const group = params.shift().toLowerCase();
