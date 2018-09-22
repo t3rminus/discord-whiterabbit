@@ -121,7 +121,7 @@ class DiceMixin extends BotBase {
 			die.total = 0;
 			
 			for(let i = 0; i < die.count; i++) {
-				const roll = Math.round(Math.random() * die.max) + 1;//random.die(die.max);
+				const roll = Math.floor(Math.random() * die.max) + 1;//random.die(die.max);
 				die.results.push(roll);
 				die.total += roll;
 			}
