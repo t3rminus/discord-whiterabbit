@@ -115,13 +115,13 @@ class DiceMixin extends BotBase {
 			throw new BotBase.BadCommandError('Unable to parse the dice');
 		}
 		
-		const random = new Random(Random.engines.browserCrypto);
+		//const random = new Random(Random.engines.browserCrypto);
 		for(const die of dice) {
 			die.results = [];
 			die.total = 0;
 			
 			for(let i = 0; i < die.count; i++) {
-				const roll = random.die(die.max);
+				const roll = Math.round(Math.random() * die.max) + 1;//random.die(die.max);
 				die.results.push(roll);
 				die.total += roll;
 			}

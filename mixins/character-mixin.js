@@ -1178,7 +1178,7 @@ module.exports = (BotBase) => {
 		}
 
 		roll__getStat(stat, message) {
-			stat = ('' + stat).trim().toLowerCase();
+			stat = Misc.stringNormalize(('' + stat).trim());
 
 			return this.getSetting(message.member, true)
 			.then((userSettings) => {
@@ -1204,15 +1204,24 @@ module.exports = (BotBase) => {
 				} else if(template && template.derivedStats && template.derivedStats[stat]) {
 					return template.derivedStats[stat].calc(character);
 				} else {
-					if(character.stats[stat]) {
-						const statVal = parseInt(character.stats[stat]);
+					const statKey = Object.keys(character.stats).find((s) => Misc.stringNormalize(s) === stat);
+					if(character.stats[statKey]) {
+						const statVal = parseInt(character.stats[statKey]);
 						return Number.isNaN(statVal) ? null : statVal;
 					}
 
 					if(template && template.derivedStats) {
 						const statKeys = Object.keys(template.derivedStats);
-						const match = statKeys.find(fs => fs.alias &&
-							(fs.alias === stat || (Array.isArray(fs.alias) && fs.alias.indexOf(stat) > -1)));
+						
+						const match = statKeys.find((key) => {
+							const dStat = template.derivedStats[key];
+							if(Array.isArray(dStat.alias)) {
+								return dStat.alias.includes((item) => Misc.stringNormalize(item) === stat);
+							} else if(typeof(dStat.alias) === 'string') {
+								return Misc.stringNormalize(dStat.alias) === stat;
+							}
+							return false;
+						});
 						if(match) {
 							return template.derivedStats[match].calc(character);
 						}
