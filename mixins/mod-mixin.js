@@ -22,6 +22,14 @@ module.exports = (BotBase) =>
 				sort: 6
 			};
 			
+			this.commands['listmembers'] = {
+				helpText: 'Lists all members on the server',
+				args: [],
+				method: 'command__listmembers',
+				adminOnly: true,
+				sort: 8
+			};
+			
 			this.addHandler(this.msg_rolecheck);
 		}
 		
@@ -178,5 +186,21 @@ module.exports = (BotBase) =>
 				}
 			}
 			return false;
+		}
+		
+		async command__listmembers(params, message) {
+			if(!(await this.isAdmin(message))) {
+				return;
+			}
+			
+			const members = message.guild.members.map(({ user = {} } = {}) => {
+				if(!user.bot) {
+					return `${user.username}#${user.discriminator}`
+				}
+			}).filter(u => u);
+			
+			const filename = `${message.guild.name.toLowerCase().replace(/[^a-z]/g, '-')}_members.txt`;
+			const attachment = new BotBase.Discord.Attachment(Buffer.from(members.join('\n'), 'utf8'), filename);
+			message.author.send(`Psst! Here’s the member list for ${message.guild.name}`, attachment);
 		}
 	};
