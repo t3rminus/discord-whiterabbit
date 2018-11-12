@@ -30,7 +30,16 @@ module.exports = (BotBase) =>
 				sort: 8
 			};
 			
+			this.commands['togglelog'] = {
+				helpText: 'Toggle logging of all messages',
+				args: [],
+				method: 'command__toggleloggle',
+				adminOnly: true,
+				sort: 9
+			};
+			
 			this.addHandler(this.msg_rolecheck);
+			this.addHelpGenerator(this.rolecheck_help);
 		}
 		
 		async command__behead(params, message) {
@@ -141,7 +150,7 @@ module.exports = (BotBase) =>
 					return false;
 				}
 				const group = params.shift().toLowerCase();
-				if(!settings.allowroles[group]) {
+				if(!settings.allowroles || !settings.allowroles[group]) {
 					return false;
 				}
 				if(!params.length) {
@@ -188,6 +197,25 @@ module.exports = (BotBase) =>
 			return false;
 		}
 		
+		async rolecheck_help(message, orgHelp) {
+			const settings = await this.getServerSettings(message);
+			if(!settings.allowroles) {
+				return orgHelp;
+			}
+			
+			const groups = Object.keys(settings.allowroles);
+			for(let i = 0; i < groups.length; i++) {
+				const group = groups[i];
+				orgHelp[group] = {
+					helpText: `Set your preferred ${group}. Use \`{prefix}${group}\` to see available options.`,
+					args: ['option'],
+					sort: 1000 + i
+				};
+			}
+			
+			return orgHelp;
+		}
+		
 		async command__listmembers(params, message) {
 			if(!(await this.isAdmin(message))) {
 				return;
@@ -202,5 +230,12 @@ module.exports = (BotBase) =>
 			const filename = `${message.guild.name.toLowerCase().replace(/[^a-z]/g, '-')}_members.txt`;
 			const attachment = new BotBase.Discord.Attachment(Buffer.from(members.join('\n'), 'utf8'), filename);
 			message.author.send(`Psst! Here’s the member list for ${message.guild.name}`, attachment);
+		}
+		
+		async command__toggleloggle(params, message) {
+			const settings = await this.getServerSettings(message);
+			this.logall[message.guild.id] = !settings.logall;
+			await this.saveServerSettings(message, { logall: !settings.logall });
+			await this.sendReply(message, `Logging enabled: ${!settings.logall ? 'true' : 'false'}`);
 		}
 	};
