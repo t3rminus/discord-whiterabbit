@@ -163,20 +163,23 @@ module.exports = (BotBase) =>
 			const markers = [];
 			
 			Object.keys(locations).forEach(id => {
-				const country = locations[id].country || 'Unknown';
-				const theCountry = summary.find(s => s.country === country);
-				if(theCountry) {
-					theCountry.count++;
-				} else {
-					summary.push({ country, count: 1 });
+				const member = message.member.guild.members.get(id);
+				if(member && member.displayHexColor) {
+					const country = locations[id].country || 'Unknown';
+					const theCountry = summary.find(s => s.country === country);
+					if(theCountry) {
+						theCountry.count++;
+					} else {
+						summary.push({ country, count: 1 });
+					}
+					
+					let color = member.displayHexColor;
+					color = color.replace(/^#/,'');
+					if(color === '000000') {
+						color = '7289DA';
+					}
+					markers.push(`size:tiny%7Ccolor:0x${color.toUpperCase()}%7C${(+locations[id].latitude).toFixed(4)},${(+locations[id].longitude).toFixed(4)}`);
 				}
-
-				let color = message.member.guild.members.get(id).displayHexColor;
-				color = color.replace(/^#/,'');
-				if(color === '000000') {
-					color = '7289DA';
-				}
-				markers.push(`size:tiny%7Ccolor:0x${color.toUpperCase()}%7C${locations[id].latitude},${locations[id].longitude}`);
 			});
 			
 			summary.sort((a,b) => a.country.localeCompare(b.country));
