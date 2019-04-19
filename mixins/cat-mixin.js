@@ -136,8 +136,6 @@ module.exports = (BotBase) =>
 				headers: {
 					'Content-type': 'application/json',
 				},
-				'proxy': 'http://127.0.0.1:8888',
-				rejectUnauthorized: false,
 				json: true
 			};
 
