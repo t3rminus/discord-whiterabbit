@@ -471,8 +471,8 @@ module.exports = (BotBase) => {
 			}
 		}
 
-		async findCharacter(name, message, distance) {
-			const characterList = await this.getCharacterList(message.member);
+		async findCharacter(name, message, distance, hideRetired = true) {
+			const characterList = await this.getCharacterList(message.member, hideRetired);
 			// Fuzzy match the name, to make sure we're not naming characters too similarly
 			let chrNames = characterList.map(c => c.name);
 			const fm = new FuzzyMatching(chrNames);
@@ -483,7 +483,7 @@ module.exports = (BotBase) => {
 
 		async saveCharacter(character, message) {
 			// Check and make sure this character is unique
-			const existingChar = await this.findCharacter(character.name, message, NAME_DISTANCE);
+			const existingChar = await this.findCharacter(character.name, message, NAME_DISTANCE, false);
 			if (existingChar) {
 				const err = new ExistingCharacter();
 				err.result = existingChar;
