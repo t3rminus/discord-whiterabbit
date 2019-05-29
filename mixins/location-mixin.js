@@ -1,5 +1,5 @@
 'use strict';
-const pr = require('request-promise'),
+const pr = require('request-promise-native'),
 	geolib = require('geolib'),
 	{ crc32 } = require('crc'),
 	Misc = require('../lib/misc');
@@ -54,7 +54,7 @@ module.exports = (BotBase) =>
 		}
 
 		async command__place(params, message) {
-			if(/^\s*$/.test(params)) {
+			if (/^\s*$/.test(params)) {
 				return this.fail(message);
 			}
 
@@ -71,8 +71,8 @@ module.exports = (BotBase) =>
 				const reply = 'I’ll remember your info, so you’ll never be lost!\n\n' +
 					`**Your location:** ${location.formatted}\n`;
 				return message.channel.send(reply);
-			} catch(err) {
-				if(err instanceof NoResultError) {
+			} catch (err) {
+				if (err instanceof NoResultError) {
 					return message.channel.send(err.message);
 				}
 				throw err;
@@ -87,7 +87,7 @@ module.exports = (BotBase) =>
 		}
 
 		async command__whereIs(params, message) {
-			if(params.toLowerCase() === 'all' || params.toLowerCase() === 'everyone') {
+			if (params.toLowerCase() === 'all' || params.toLowerCase() === 'everyone') {
 				return this.whereIsAll(message);
 			}
 
@@ -98,7 +98,7 @@ module.exports = (BotBase) =>
 			const myData = locations && locations[message.member.id];
 
 			const users = await this.findUsers(params, message);
-			
+
 			users.filter(m => m && m.user && m.user.bot).forEach(b => {
 				const wonderland = geolib.computeDestinationPoint(birmingham, Math.random() * 200000, Math.random() * 360);
 				locations[b.user.id] = {
@@ -110,18 +110,18 @@ module.exports = (BotBase) =>
 					formatted: 'Wonderland, United Kingdom'
 				};
 			});
-			
+
 			const results = users.map(member => {
-				if(member && member.id) {
-					if(locations && locations[member.user.id]) {
-						if(myData) {
+				if (member && member.id) {
+					if (locations && locations[member.user.id]) {
+						if (myData) {
 							const distance = Math.round(geolib.getDistanceSimple(locations[member.user.id], myData) / 1000);
 							const displayDistance = userSettings && userSettings.units === 'imperial'
 								? `${formatNumber(distance / 1.609344)} miles`
 								: `${formatNumber(distance)} km`;
-							if(member.user.id === message.member.id) {
+							if (member.user.id === message.member.id) {
 								return `**${member.displayName}:** is in ${locations[member.user.id].formatted}.`;
-							} else if(distance < 100) {
+							} else if (distance < 100) {
 								return `**${member.displayName}:** is in ${locations[member.user.id].formatted}. They are in the same place you are! Lucky!`;
 							} else {
 								return `**${member.displayName}:** is in ${locations[member.user.id].formatted}. They are ${displayDistance} away from you.`;
@@ -136,63 +136,63 @@ module.exports = (BotBase) =>
 					return `**${this.sanitize(member, message)}:** I couldn’t find that user.`;
 				}
 			}).filter(m => m);
-			
-			if(users.length === 2) {
-				if(locations && locations[users[0].user.id] && locations[users[1].user.id]) {
+
+			if (users.length === 2) {
+				if (locations && locations[users[0].user.id] && locations[users[1].user.id]) {
 					const distance = Math.round(geolib.getDistanceSimple(locations[users[0].user.id], locations[users[1].user.id]) / 1000);
-					
+
 					const displayDistance = userSettings && userSettings.units === 'imperial'
 						? `${formatNumber(distance / 1.609344)} miles`
 						: `${formatNumber(distance)} km`;
-					
-					if(distance < 100) {
+
+					if (distance < 100) {
 						results.push(`${users[0].displayName} is in the same place as ${users[1].displayName}! Lucky!`);
 					} else {
 						results.push(`${users[0].displayName} is ${displayDistance} away from ${users[1].displayName}`);
 					}
 				}
 			}
-			
+
 			// Join all results with newlines, and print the message
 			return message.channel.send(results.join('\n\n'));
 		}
-		
+
 		async whereIsAll(message) {
 			const locations = await this.getSetting(message.member, '-location') || {};
 			const summary = [];
 			const markers = [];
-			
+
 			Object.keys(locations).forEach(id => {
 				const member = message.member.guild.members.get(id);
-				if(member && member.displayHexColor) {
+				if (member && member.displayHexColor) {
 					const country = locations[id].country || 'Unknown';
 					const theCountry = summary.find(s => s.country === country);
-					if(theCountry) {
+					if (theCountry) {
 						theCountry.count++;
 					} else {
 						summary.push({ country, count: 1 });
 					}
-					
+
 					let color = member.displayHexColor;
-					color = color.replace(/^#/,'');
-					if(color === '000000') {
+					color = color.replace(/^#/, '');
+					if (color === '000000') {
 						color = '7289DA';
 					}
 					markers.push(`size:tiny%7Ccolor:0x${color.toUpperCase()}%7C${(+locations[id].latitude).toFixed(4)},${(+locations[id].longitude).toFixed(4)}`);
 				}
 			});
-			
-			summary.sort((a,b) => a.country.localeCompare(b.country));
+
+			summary.sort((a, b) => a.country.localeCompare(b.country));
 			const result = summary.map(s => `**${s.country}:** ${s.count} member${s.count > 1 ? 's' : ''}`).join('\n')
 				|| 'Nobody has saved their locations yet!';
-			
+
 			const markerStr = markers.map(m => `&markers=${m}`).join('');
 			const gmap = `https://maps.googleapis.com/maps/api/staticmap?center=0,0&scale=2&zoom=1&size=600x380${markerStr}&key=${GKEY}`;
 			const crc = crc32(markerStr).toString(16);
-			
-			return message.channel.send(result, new BotBase.Discord.Attachment(gmap,`map${crc}.png`));
+
+			return message.channel.send(result, new BotBase.Discord.Attachment(gmap, `map${crc}.png`));
 		}
-		
+
 		async plHandleLeave(member) {
 			const serverSettings = await this.getSetting(member, '-location') || {};
 			delete serverSettings[member.id];
@@ -206,7 +206,7 @@ module.exports = (BotBase) =>
 				throw new NoResultError('Could not find that location');
 			}
 
-			const {results: [firstResult = { address_components: [] }] = []} = result;
+			const { results: [firstResult = { address_components: [] }] = [] } = result;
 
 			let city = firstResult.address_components.find(c => c.types.includes('locality')) || null;
 			let province = firstResult.address_components.find(c => c.types.includes('administrative_area_level_1')) || null;
@@ -216,7 +216,7 @@ module.exports = (BotBase) =>
 			province = province && province.short_name;
 			country = country && country.long_name;
 
-			if(!country) {
+			if (!country) {
 				throw new NoResultError('Could not find that location');
 			}
 
@@ -224,7 +224,7 @@ module.exports = (BotBase) =>
 				latitude: firstResult.geometry.location.lat,
 				longitude: firstResult.geometry.location.lng,
 				city, province, country,
-				formatted: [city,province,country].filter(i => i).join(', ')
+				formatted: [city, province, country].filter(i => i).join(', ')
 			};
 		}
 	};

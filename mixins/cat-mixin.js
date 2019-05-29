@@ -1,6 +1,6 @@
 'use strict';
 const Misc = require('../lib/misc'),
-	pr = require('request-promise'),
+	pr = require('request-promise-native'),
 	{ extname } = require('path'),
 	Jimp = require('jimp');
 
