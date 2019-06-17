@@ -1,41 +1,36 @@
 {
-  "name": "discord-whiterabbit",
-  "version": "1.0.0",
-  "description": "Bot for Discord to coordinate people in different timezones",
-  "main": "main.js",
-  "engines": {
-    "node": "^8.4.0",
-    "npm": "^5.7.0"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node main.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/t3rminus/discord-whiterabbit.git"
-  },
-  "author": "Kevin S",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/t3rminus/discord-whiterabbit/issues"
-  },
-  "homepage": "https://github.com/t3rminus/discord-whiterabbit#readme",
-  "dependencies": {
-    "crc": "^3.7.0",
-    "date-chinese": "^1.0.3",
-    "discord.js": "^11.5.0",
-    "fs-extra": "^4.0.2",
-    "fuzzy-matching": "^0.4.3",
-    "geolib": "^2.0.24",
-    "ioredis": "^3.2.1",
-    "jimp": "^0.5.0",
-    "mixwith": "^0.1.1",
-    "moment-timezone": "^0.5.13",
-    "node-schedule": "^1.2.5",
-    "random-js": "^1.0.8",
-    "request": "^2.88.0",
-    "request-promise-native": "^1.0.7"
-  },
-  "devDependencies": {}
+	"name": "discord-whiterabbit",
+	"version": "1.0.0",
+	"description": "Bot for Discord to coordinate people in different timezones",
+	"main": "main.js",
+	"engines": {
+		"node": "^10.16.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/t3rminus/discord-whiterabbit.git"
+	},
+	"author": "Kevin S",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/t3rminus/discord-whiterabbit/issues"
+	},
+	"homepage": "https://github.com/t3rminus/discord-whiterabbit#readme",
+	"dependencies": {
+		"crc": "^3.7.0",
+		"date-chinese": "^1.0.3",
+		"discord.js": "^11.5.0",
+		"fs-extra": "^4.0.2",
+		"fuzzy-matching": "^0.4.3",
+		"geolib": "^2.0.24",
+		"ioredis": "^3.2.1",
+		"jimp": "^0.5.0",
+		"mixwith": "^0.1.1",
+		"moment-timezone": "^0.5.13",
+		"node-schedule": "^1.2.5",
+		"random-js": "^1.0.8",
+		"request": "^2.88.0",
+		"request-promise-native": "^1.0.7"
+	},
+	"devDependencies": {}
 }
