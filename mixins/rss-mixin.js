@@ -100,11 +100,11 @@ module.exports = (BotBase) =>
 
 			const result = Object.keys(feedsByChannel).map((channelId) => {
 				const channel = message.guild.channels.get(channelId);
-				const feeds = feedsByChannel[channelId].map(f => ` - ${f.url}`);
+				const feeds = feedsByChannel[channelId].map(f => ` - ${f.url}\n`).join('');
 				if(channel) {
-					return `\`\`\` #${channel.name}\n ${feeds}\`\`\``;
+					return `\`\`\` #${channel.name}\n${feeds}\`\`\``;
 				} else {
-					return `\`\`\` (deleted channel)\n ${feeds}\`\`\``;
+					return `\`\`\` (deleted channel)\n${feeds}\`\`\``;
 				}
 			});
 
