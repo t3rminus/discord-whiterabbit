@@ -115,7 +115,7 @@ module.exports = (BotBase) =>
 				if (member && member.id) {
 					if (locations && locations[member.user.id]) {
 						if (myData) {
-							const distance = Math.round(geolib.getDistanceSimple(locations[member.user.id], myData) / 1000);
+							const distance = Math.round(geolib.getDistance(locations[member.user.id], myData) / 1000);
 							const displayDistance = userSettings && userSettings.units === 'imperial'
 								? `${formatNumber(distance / 1.609344)} miles`
 								: `${formatNumber(distance)} km`;
@@ -139,7 +139,7 @@ module.exports = (BotBase) =>
 
 			if (users.length === 2) {
 				if (locations && locations[users[0].user.id] && locations[users[1].user.id]) {
-					const distance = Math.round(geolib.getDistanceSimple(locations[users[0].user.id], locations[users[1].user.id]) / 1000);
+					const distance = Math.round(geolib.getDistance(locations[users[0].user.id], locations[users[1].user.id]) / 1000);
 
 					const displayDistance = userSettings && userSettings.units === 'imperial'
 						? `${formatNumber(distance / 1.609344)} miles`
