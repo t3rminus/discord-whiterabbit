@@ -252,11 +252,14 @@ module.exports = (BotBase) =>
 				return;
       }
 
+
       const reply = [];
       for(const [,role] of message.guild.roles) {
         reply.push(`**${this.sanitize(role.name)}:**\n - Color: ${role.hexColor}\n - Members: ${role.members.size}\n - Position: ${role.calculatedPosition}\n - Mentionable: ${role.mentionable}`);
       }
-      message.author.send(`Psst! Here’s the role list for ${message.guild.name}:`);
-      message.author.send(reply.join('\n'));
+
+      const filename = `${message.guild.name.toLowerCase().replace(/[^a-z]/g, '-')}_roles.txt`;
+      const attachment = new BotBase.Discord.Attachment(Buffer.from(reply.join('\n'), 'utf8'), filename);
+      message.author.send(`Psst! Here’s the role list for ${message.guild.name}:`, attachment);
     }
 	};
