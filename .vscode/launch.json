@@ -1,12 +1,13 @@
 {
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"type": "node",
-			"request": "launch",
-			"name": "Launch Program",
-			"program": "${workspaceFolder}/main.js",
-			"envFile": "${workspaceFolder}/.env"
-		}
-	]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Program",
+      "program": "${workspaceFolder}/main.js",
+      "envFile": "${workspaceFolder}/.env",
+      "runtimeVersion": "14.5.0"
+    }
+  ]
 }
