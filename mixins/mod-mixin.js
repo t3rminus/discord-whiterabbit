@@ -210,7 +210,7 @@ module.exports = (BotBase) =>
             }
           }
         } catch (err) {
-          console.error(err);
+          console.erroror(err);
         }
       }
       return false;
