@@ -6,8 +6,7 @@
       "request": "launch",
       "name": "Launch Program",
       "program": "${workspaceFolder}/main.js",
-      "envFile": "${workspaceFolder}/.env",
-      "runtimeVersion": "14.5.0"
+      "envFile": "${workspaceFolder}/.env"
     }
   ]
 }

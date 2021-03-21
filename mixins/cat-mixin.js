@@ -2,13 +2,34 @@
 const Misc = require('../lib/misc');
 const pr = require('request-promise-native');
 const { extname } = require('path');
-const Jimp = require('jimp');
+const sharp = require('sharp');
+const fs = require('fs-extra');
 
-const buttSRC = Jimp.read('images/cat_butt.png');
-const headSRC = Jimp.read('images/cat_head.png');
-const fuzzSRC = Jimp.read('images/cat_fuzz.png');
+const butt = sharp('images/cat_butt.png');
+const head = sharp('images/cat_head.png');
+const fuzz = sharp('images/cat_fuzz.png');
+
+const flickrAttrib = fs.readFile('images/flickrattrib.svg', 'utf8');
 
 const boiHeight = 60;
+
+const foxAlts = [
+  'ringdingdingdingdingeringeding',
+  'geringdingdingdingdingeringeding',
+  'wapapapapapapow',
+  'hateehateehateeho',
+  'jofftchofftchoffotchoffotchoff',
+  'tchofftchofftchoffotchoffotchoff',
+  'jachachachachachachow',
+  'chachachachachachachow',
+  'frakakakakakakakakow',
+  'aheeaheehahee',
+  'wawawaydo',
+  'wubwidbiddumwaydo',
+  'baybudabuddumbam',
+  'mamadumdaydo',
+  'abaybadabumbumbaydo'
+];
 
 const APIS = {
   cat: {
@@ -56,11 +77,32 @@ module.exports = (BotBase) =>
         sort: 143
       };
 
+      this.commands.yip = {
+        helpText: 'Need a foxxo to cheer you up?',
+        args: [],
+        method: 'command__yip',
+        sort: 143
+      };
+
+      this.commands.dook = {
+        helpText: 'Need an otter for your water? A ferret for your merit? A weasel for your... diesel?',
+        args: [],
+        method: 'command__dook',
+        sort: 144
+      };
+
+      this.commands.baah = {
+        helpText: 'Hey, you! Peep this sheep!',
+        args: [],
+        method: 'command__baah',
+        sort: 145
+      };
+
       this.commands.snek = {
         helpText: 'Allow me to provide you with only the finest danger noodles.',
         args: [],
         method: 'command__snek',
-        sort: 143
+        sort: 146
       };
 
       this.addHandler(this.isACat);
@@ -71,23 +113,49 @@ module.exports = (BotBase) =>
       if (!params[0] || isNaN(+params[0])) {
         return this.fail(message);
       }
-      let longboi = +params[0];
-      longboi = longboi > 20 ? 20 : longboi;
-      longboi = longboi <= 1 ? 1 : longboi;
+      const longboi = Math.min(Math.max(+params[0], 1), 30);
 
-      const [butt, head, fuzz] = await Promise.all([buttSRC, headSRC, fuzzSRC]);
-      const cat = Math.floor(Math.random() * (head.bitmap.height / boiHeight)) * boiHeight;
-      const newImage = await CatMixin.newImage(butt.bitmap.width + head.bitmap.width + (fuzz.bitmap.width * longboi), boiHeight, 0x00000000);
+      const buttMeta = await butt.metadata();
+      const headMeta = await head.metadata();
+      const fuzzMeta = await fuzz.metadata();
+      const cat = Math.floor(Math.random() * (headMeta.height / boiHeight)) * boiHeight;
 
-      newImage.blit(butt, 0, 0, 0, cat, butt.bitmap.width, boiHeight);
+      const cropButt = await butt.extract({ top: cat, left: 0, width: buttMeta.width, height: boiHeight }).toBuffer();
+      const cropHead = await head.extract({ top: cat, left: 0, width: headMeta.width, height: boiHeight }).toBuffer();
+      const cropFuzz = await fuzz.extract({ top: cat, left: 0, width: fuzzMeta.width, height: boiHeight }).toBuffer();
+
+      const compositeOperation = [
+        {
+          input: cropButt,
+          top: 0,
+          left: 0
+        },
+        {
+          input: cropHead,
+          top: 0,
+          left: buttMeta.width + (longboi * fuzzMeta.width)
+        }
+      ];
       for (let i = 0; i < longboi; i++) {
-        newImage.blit(fuzz, butt.bitmap.width + (fuzz.bitmap.width * i), 0, 0, cat, fuzz.bitmap.width, boiHeight);
+        compositeOperation.push({
+          input: cropFuzz,
+          top: 0,
+          left: buttMeta.width + (i * fuzzMeta.width)
+        });
       }
-      newImage.blit(head, butt.bitmap.width + (fuzz.bitmap.width * longboi), 0, 0, cat, head.bitmap.width, boiHeight);
 
-      const imgBuffer = await CatMixin.getImageBuffer(newImage, Jimp.MIME_PNG);
+      const newImage = await sharp({
+          create: {
+            width: buttMeta.width + headMeta.width + (fuzzMeta.width * longboi),
+            height: boiHeight,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0.0 }
+          }
+        })
+        .composite(compositeOperation)
+        .png().toBuffer();
 
-      return this.sendReply(message, new BotBase.Discord.Attachment(imgBuffer, `cat_${Misc.unixTimestamp()}.png`));
+      return this.sendReply(message, new BotBase.Discord.Attachment(newImage, `cat_${Misc.unixTimestamp()}.png`));
     }
 
     async getPet (message, kind) {
@@ -154,7 +222,8 @@ module.exports = (BotBase) =>
       // These users abuse tags, and are therefore excluded from results.
       const blackList = ['65237496@N03', '47445767@N05', '29633037@N05', '76771480@N04',
         '22824835@N07', '114976295@N06', '79760361@N08', '69573851@N06', '17868205@N00',
-        '17868205@N00'];
+        '17868205@N00', '61021753@N02', '98403995@N08', '126377022@N07', '14915441@N07',
+        '12356580@N00'];
       let idx = Math.floor(Math.random() * photo.length);
       let thePhoto = photo[idx];
       while (blackList.includes(thePhoto.owner)) {
@@ -170,8 +239,18 @@ module.exports = (BotBase) =>
 
       const attachmentName = `flickr__${thePhoto.owner}-${thePhoto.id}__.jpg`;
       const url = `https://farm${thePhoto.farm}.staticflickr.com/${thePhoto.server}/${thePhoto.id}_${thePhoto.secret}_c.jpg`;
-      const attribution = `From Flickr: <https://flickr.com/photos/${thePhoto.owner}/${thePhoto.id}>`;
-      return this.sendReply(message, attribution, { file: new BotBase.Discord.Attachment(url, attachmentName) });
+      const attribution = `flickr.com/photos/${thePhoto.owner}/${thePhoto.id}`;
+
+      const imgBuffer = await pr({ url, encoding: null });
+      const img = sharp(imgBuffer);
+      const flickrOverlay = await sharp(Buffer.from((await flickrAttrib).replace('%TEXTHERE%', attribution))).toBuffer();
+
+      img.composite([{
+        input: flickrOverlay,
+        gravity: 'southwest'
+      }]);
+
+      return this.sendReply(message, { file: new BotBase.Discord.Attachment(await img.jpeg().toBuffer(), attachmentName) });
     }
 
     command__meow (params, message) {
@@ -188,6 +267,18 @@ module.exports = (BotBase) =>
 
     command__snek (params, message) {
       return this.getFlickr(message, 'snake', ['animal']);
+    }
+
+    command__dook (params, message) {
+      return this.getFlickr(message, 'otter ferret', ['animal']);
+    }
+
+    command__baah (params, message) {
+      return this.getFlickr(message, 'sheep lamb', ['animal']);
+    }
+
+    command__yip (params, message) {
+      return this.getFlickr(message, 'fox', ['animal']);
     }
 
     async reactionAdded (messageReaction, user) {
@@ -256,37 +347,27 @@ module.exports = (BotBase) =>
     async isACat (message) {
       if (message.member && message.member.id !== this.bot.user.id) {
         const settings = await this.getServerSettings(message);
-        const prefix = settings.prefix || '?';
+        let prefix = settings.prefix || this.defaultSettings.prefix;
+        if (process.env.NODE_ENV === 'dev') {
+          prefix = 'dev' + prefix;
+        }
 
-        // Match command at beginning of message
-        const matchCmd = new RegExp(`^${BotBase.Misc.escapeRegex(prefix)}c(a+)t(\s*|$)`);
-        const match = matchCmd.exec(message.content);
+        if(message.content && message.content.indexOf(prefix) === 0) {
+          // Match command at beginning of message
+          const matchCmd = new RegExp(`^${BotBase.Misc.escapeRegex(prefix)}c(a+)t(\s*|$)`);
+          const match = matchCmd.exec(message.content);
 
-        if (match && match.length && match[1]) {
-          return this.command__longcat([match[1].length], message);
+          if (match && match.length && match[1]) {
+            return this.command__longcat([match[1].length], message);
+          }
+
+          const foxCmds = foxAlts.map(f => prefix + f);
+          const messageClean = new RegExp(`[^${BotBase.Misc.escapeRegex(prefix)}a-z]+`, 'g');
+          const bareText = message.content.toLowerCase().replace(messageClean, '').trim();
+          if(foxCmds.includes(bareText)) {
+            return this.command__yip(null, message);
+          }
         }
       }
-    }
-
-    static newImage (w, h, color) {
-      return new Promise((resolve, reject) => {
-        new Jimp(w, h, color, (err, image) => {
-          if (err) {
-            return reject(err);
-          }
-          return resolve(image);
-        });
-      });
-    }
-
-    static getImageBuffer (image, mime) {
-      return new Promise((resolve, reject) => {
-        image.getBuffer(mime, (err, image) => {
-          if (err) {
-            return reject(err);
-          }
-          return resolve(image);
-        });
-      });
     }
   };
