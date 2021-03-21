@@ -201,7 +201,8 @@ module.exports = (BotBase) =>
           page: `${page}`,
           format: 'json',
           nojsoncallback: '1',
-          sort: 'relevance'
+          sort: 'relevance',
+          extras: 'media'
         },
         headers: {
           'Content-type': 'application/json'
@@ -222,22 +223,21 @@ module.exports = (BotBase) =>
       }
 
       // These users abuse tags, and are therefore excluded from results.
-      const blackList = ['65237496@N03', '47445767@N05', '29633037@N05', '76771480@N04',
+      const blockList = ['65237496@N03', '47445767@N05', '29633037@N05', '76771480@N04',
         '22824835@N07', '114976295@N06', '79760361@N08', '69573851@N06', '17868205@N00',
         '17868205@N00', '61021753@N02', '98403995@N08', '126377022@N07', '14915441@N07',
-        '12356580@N00'];
-      let idx = Math.floor(Math.random() * photo.length);
-      let thePhoto = photo[idx];
-      while (blackList.includes(thePhoto.owner)) {
-        photo.splice(idx, 1);
-        if (!photo.length) {
-          console.log('Ran out of images.');
-          return this.getFlickr(message, search, requiredTags, pages);
-        }
+        '12356580@N00', '71213045@N06'];
 
-        idx = Math.floor(Math.random() * photo.length);
-        thePhoto = photo[idx];
+      const filteredPhotos = photo
+        .filter(p => !blockList.includes(p.owner))
+        .filter(p => p.media === 'photo');
+
+      if(!filteredPhotos.length) {
+        console.log('Ran out of images.');
+        return this.getFlickr(message, search, requiredTags, pages);
       }
+
+      const thePhoto = pickOne(filteredPhotos);
 
       const attachmentName = `flickr__${thePhoto.owner}-${thePhoto.id}__.jpg`;
       const url = `https://farm${thePhoto.farm}.staticflickr.com/${thePhoto.server}/${thePhoto.id}_${thePhoto.secret}_c.jpg`;
@@ -272,7 +272,7 @@ module.exports = (BotBase) =>
     }
 
     command__dook (params, message) {
-      return this.getFlickr(message, pickOne(['otter','weasel','ferret','badger']), ['animal']);
+      return this.getFlickr(message, pickOne(['otter','otter','otter','ferret','ferret','ferret','weasel','weasel','badger']), ['animal']);
     }
 
     command__baah (params, message) {
