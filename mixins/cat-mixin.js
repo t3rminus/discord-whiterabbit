@@ -31,6 +31,8 @@ const foxAlts = [
   'abaybadabumbumbaydo'
 ];
 
+const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 const APIS = {
   cat: {
     uri: 'https://api.thecatapi.com/v1/images/search',
@@ -270,11 +272,11 @@ module.exports = (BotBase) =>
     }
 
     command__dook (params, message) {
-      return this.getFlickr(message, 'otter ferret', ['animal']);
+      return this.getFlickr(message, pickOne(['otter','weasel','ferret','badger']), ['animal']);
     }
 
     command__baah (params, message) {
-      return this.getFlickr(message, 'sheep lamb', ['animal']);
+      return this.getFlickr(message, pickOne(['sheep','lamb']), ['animal']);
     }
 
     command__yip (params, message) {
