@@ -31,6 +31,20 @@ const foxAlts = [
   'abaybadabumbumbaydo'
 ];
 
+// These tags are often included with photos that aren't actual photos of animals
+// Plus tags for things we don't want to display
+const flickrBlockedTags = ['-stuffed','-party','-art','-screenshot',
+  '-illustration','-taxidermy','-specimens','-character','-fantasy',
+  '-team','-sports','-band','-craft','-protest','-pollution','-skull',
+  '-skulls','-bones'];
+
+// These users abuse image tags, and are therefore excluded from results.
+const flickrBlockList = ['65237496@N03', '47445767@N05', '29633037@N05', '76771480@N04',
+  '22824835@N07', '114976295@N06', '79760361@N08', '69573851@N06', '17868205@N00',
+  '17868205@N00', '61021753@N02', '98403995@N08', '126377022@N07', '14915441@N07',
+  '12356580@N00', '71213045@N06', '57382496@N04', '146799285@N05', '56087830@N00',
+  '35427622@N05', '76676024@N07', '143905885@N06', '71833159@N000','11024337@N03'];
+
 const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const APIS = {
@@ -193,7 +207,7 @@ module.exports = (BotBase) =>
         qs: {
           method: 'flickr.photos.search',
           api_key: process.env.FLICKR_API_KEY,
-          tags: requiredTags.join(','),
+          tags: requiredTags.concat(flickrBlockedTags).join(','),
           tag_mode: 'all',
           text: search,
           safe_search: '1',
@@ -222,14 +236,8 @@ module.exports = (BotBase) =>
         throw new Error('No results were found');
       }
 
-      // These users abuse tags, and are therefore excluded from results.
-      const blockList = ['65237496@N03', '47445767@N05', '29633037@N05', '76771480@N04',
-        '22824835@N07', '114976295@N06', '79760361@N08', '69573851@N06', '17868205@N00',
-        '17868205@N00', '61021753@N02', '98403995@N08', '126377022@N07', '14915441@N07',
-        '12356580@N00', '71213045@N06'];
-
       const filteredPhotos = photo
-        .filter(p => !blockList.includes(p.owner))
+        .filter(p => !flickrBlockList.includes(p.owner))
         .filter(p => p.media === 'photo');
 
       if(!filteredPhotos.length) {
@@ -252,7 +260,11 @@ module.exports = (BotBase) =>
         gravity: 'southwest'
       }]);
 
-      return this.sendReply(message, { file: new BotBase.Discord.Attachment(await img.jpeg().toBuffer(), attachmentName) });
+      if (process.env.NODE_ENV === 'dev') {
+        return this.sendReply(message, `<https://${attribution}>`, { file: new BotBase.Discord.Attachment(await img.jpeg().toBuffer(), attachmentName) });
+      } else {
+        return this.sendReply(message, { file: new BotBase.Discord.Attachment(await img.jpeg().toBuffer(), attachmentName) });
+      }
     }
 
     command__meow (params, message) {
