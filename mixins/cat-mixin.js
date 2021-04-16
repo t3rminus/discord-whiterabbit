@@ -8,10 +8,9 @@ const fs = require('fs-extra');
 const butt = sharp('images/cat_butt.png');
 const head = sharp('images/cat_head.png');
 const fuzz = sharp('images/cat_fuzz.png');
+const boiHeight = 60;
 
 const flickrAttrib = fs.readFile('images/flickrattrib.svg', 'utf8');
-
-const boiHeight = 60;
 
 const foxAlts = [
   'ringdingdingdingdingeringeding',
@@ -33,19 +32,66 @@ const foxAlts = [
 
 // These tags are often included with photos that aren't actual photos of animals
 // Plus tags for things we don't want to display
-const flickrBlockedTags = ['-stuffed','-party','-art','-screenshot',
-  '-illustration','-taxidermy','-specimens','-character','-fantasy',
-  '-team','-sports','-band','-craft','-protest','-pollution','-skull',
-  '-skulls','-bones'];
+const flickrBlockedTags = ['stuffed','party','art','screenshot','screenshots',
+  'illustration','illustrations','taxidermy','specimen','specimens','character',
+  'characters','fantasy','team','sports','band','teams','sport','bands','craft',
+  'crafts','protest','protests','pollution','oil','skull','skulls','bones',
+  'bone','blood','horror','butcher','slaughter','butchers','meat','chop','cutting',
+  'chops','hotel','hotels','prop','movie','movies','needle-felted','felted','crafts',
+  'art','painting','dead','watercolor','death','corpse','decomposing','roadkill',
+  'carrion','flesh','captivity','painter','private collection','poster','lost',
+  'magazine','scan','scanned','yearbook','tejon','prey','mating','intercourse',
+  'genitals','humping','sex','scat','dung','poop','excrement','shit','feces',
+  'faeces','manure','excreta','lab','laboratory','toy','plush','stuffed','figurines',
+  'porcelain','ceramic','figures'];
 
 // These users abuse image tags, and are therefore excluded from results.
 const flickrBlockList = ['65237496@N03', '47445767@N05', '29633037@N05', '76771480@N04',
   '22824835@N07', '114976295@N06', '79760361@N08', '69573851@N06', '17868205@N00',
   '17868205@N00', '61021753@N02', '98403995@N08', '126377022@N07', '14915441@N07',
   '12356580@N00', '71213045@N06', '57382496@N04', '146799285@N05', '56087830@N00',
-  '35427622@N05', '76676024@N07', '143905885@N06', '71833159@N000','11024337@N03'];
+  '35427622@N05', '76676024@N07', '143905885@N06', '71833159@N000','11024337@N03',
+  '57608719@N08', '13497267@N04', '39404969@N08', '32481985@N00', '12947266@N08',
+  '7470842@N04',  '98307374@N00', '42926702@N06', '68524128@N00', '24545757@N06',
+  '15051066@N03', '17068379@N00', '10102179@N00', '31322082@N08'];
 
 const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const checkTags = (tags) => !flickrBlockedTags.some(blocked => tags.includes(blocked));
+const b58 = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+const b58encode = (num) => {
+  const output = [];
+  while(num >= b58.length) {
+    const div = num / b58.length;
+    const mod = num - (b58.length * Math.floor(div));
+    output.push(b58[mod]);
+    num = Math.floor(div);
+  }
+  if(num) {
+    output.push(b58[num]);
+  }
+  return output.reverse().join('');
+}
+
+const flickrPageCache = {};
+const flickrCacheTTL = 10800;
+const queryToKey = (search,tags) => `${search}__${tags.join('-')}`;
+const getCachedPages = (search,tags) => {
+  const key = queryToKey(search,tags);
+  const val = flickrPageCache[key];
+  if(val && Misc.unixTimestamp() - val.time < flickrCacheTTL) {
+    return val.value;
+  } else if(val) {
+    delete flickrPageCache[key];
+  }
+  return null;
+}
+const setCachedPages = (search,tags,pages) => {
+  const key = queryToKey(search,tags);
+  flickrPageCache[key] = {
+    value: pages,
+    time: Misc.unixTimestamp()
+  };
+}
 
 const APIS = {
   cat: {
@@ -59,6 +105,8 @@ const APIS = {
     key: process.env.DOG_API_KEY
   }
 };
+
+const recentFlickrPhotos = [];
 
 module.exports = (BotBase) =>
   class CatMixin extends BotBase {
@@ -200,14 +248,15 @@ module.exports = (BotBase) =>
       return this.sendReply(message, new BotBase.Discord.Attachment(pet.url, attachmentName));
     }
 
-    async getFlickr (message, search, requiredTags, maxPage = 200) {
-      const page = Math.ceil(Math.random() * maxPage);
+    async getFlickr (message, search, requiredTags, maxPage) {
+      const cachedPages = maxPage || getCachedPages(search,requiredTags);
+      const page = Math.ceil(Math.random() * (cachedPages || 200));
       const request = {
         uri: 'https://api.flickr.com/services/rest',
         qs: {
           method: 'flickr.photos.search',
           api_key: process.env.FLICKR_API_KEY,
-          tags: requiredTags.concat(flickrBlockedTags).join(','),
+          tags: requiredTags.join(','),
           tag_mode: 'all',
           text: search,
           safe_search: '1',
@@ -216,7 +265,7 @@ module.exports = (BotBase) =>
           format: 'json',
           nojsoncallback: '1',
           sort: 'relevance',
-          extras: 'media'
+          extras: 'media,tags,url_c,owner_name'
         },
         headers: {
           'Content-type': 'application/json'
@@ -230,6 +279,7 @@ module.exports = (BotBase) =>
         throw new Error('Unable to query FLICKR');
       }
       if (page > pages) {
+        setCachedPages(search, requiredTags, pages);
         return this.getFlickr(message, search, requiredTags, pages);
       }
       if (!photo.length) {
@@ -238,20 +288,28 @@ module.exports = (BotBase) =>
 
       const filteredPhotos = photo
         .filter(p => !flickrBlockList.includes(p.owner))
-        .filter(p => p.media === 'photo');
+        .filter(p => p.media === 'photo')
+        .filter(p => checkTags(p.tags.toLowerCase().split(' ')))
+        .filter(p => p.url_c)
+        .filter(p => !recentFlickrPhotos.includes(p.id));
 
-      if(!filteredPhotos.length) {
+      if (!filteredPhotos.length) {
         console.log('Ran out of images.');
         return this.getFlickr(message, search, requiredTags, pages);
       }
 
       const thePhoto = pickOne(filteredPhotos);
 
-      const attachmentName = `flickr__${thePhoto.owner}-${thePhoto.id}__.jpg`;
-      const url = `https://farm${thePhoto.farm}.staticflickr.com/${thePhoto.server}/${thePhoto.id}_${thePhoto.secret}_c.jpg`;
-      const attribution = `flickr.com/photos/${thePhoto.owner}/${thePhoto.id}`;
+      recentFlickrPhotos.unshift(thePhoto.id);
+      recentFlickrPhotos.length = Math.min(recentFlickrPhotos.length, 1000);
 
-      const imgBuffer = await pr({ url, encoding: null });
+      const b58id = b58encode(thePhoto.id);
+      const attachmentName = `flic.kr.p.${b58id}.jpg`;
+      //const uri = `https://farm${thePhoto.farm}.staticflickr.com/${thePhoto.server}/${thePhoto.id}_${thePhoto.secret}_c.jpg`;
+      //const attribution = `flickr.com/photos/${thePhoto.owner}/${thePhoto.id}`;
+      const attribution = `flic.kr/p/${b58id}`;
+
+      const imgBuffer = await pr({ uri: thePhoto.url_c, encoding: null });
       const img = sharp(imgBuffer);
       const flickrOverlay = await sharp(Buffer.from((await flickrAttrib).replace('%TEXTHERE%', attribution))).toBuffer();
 
@@ -280,19 +338,21 @@ module.exports = (BotBase) =>
     }
 
     command__snek (params, message) {
-      return this.getFlickr(message, 'snake', ['animal']);
+      return this.getFlickr(message, 'snake', ['snake','animal']);
     }
 
     command__dook (params, message) {
-      return this.getFlickr(message, pickOne(['otter','otter','otter','ferret','ferret','ferret','weasel','weasel','badger']), ['animal']);
+      const animal = pickOne(['otter','otter','otter','otter','ferret','ferret','ferret','ferret','weasel','weasel','badger']);
+      return this.getFlickr(message, animal, [animal, 'animal','-cat','-dog','-deer','-cats','-dogs']);
     }
 
     command__baah (params, message) {
-      return this.getFlickr(message, pickOne(['sheep','lamb']), ['animal']);
+      const animal = pickOne(['sheep','lamb']);
+      return this.getFlickr(message, animal, [animal, 'animal']);
     }
 
     command__yip (params, message) {
-      return this.getFlickr(message, 'fox', ['animal']);
+      return this.getFlickr(message, 'fox', ['fox','animal']);
     }
 
     async reactionAdded (messageReaction, user) {

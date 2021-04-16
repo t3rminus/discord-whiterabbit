@@ -4,7 +4,7 @@
 	"description": "Bot for Discord to coordinate people in different timezones",
 	"main": "main.js",
 	"engines": {
-		"node": "^10.16.0"
+		"node": "15.x"
 	},
 	"repository": {
 		"type": "git",
