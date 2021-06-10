@@ -65,7 +65,7 @@ module.exports = (BotBase) =>
 
         let begone = false;
         if(serverSettings.begones) {
-          begone = serverSettings.begones.find(begone => (new RegExp(begone)).test(member.user.username.toLowerCase()));
+          begone = serverSettings.begones.find(begone => (new RegExp(begone.pattern)).test(member.user.username.toLowerCase()));
         }
 
         if(begone && begone.ban) {
