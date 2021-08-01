@@ -43,7 +43,7 @@ const flickrBlockedTags = ['stuffed','party','art','screenshot','screenshots',
   'magazine','scan','scanned','yearbook','tejon','prey','mating','intercourse',
   'genitals','humping','sex','scat','dung','poop','excrement','shit','feces',
   'faeces','manure','excreta','lab','laboratory','toy','plush','stuffed','figurines',
-  'porcelain','ceramic','figures'];
+  'porcelain','ceramic','figures','paint','mask','prosthetic'];
 
 // These users abuse image tags, and are therefore excluded from results.
 const flickrBlockList = ['65237496@N03', '47445767@N05', '29633037@N05', '76771480@N04',
@@ -53,7 +53,8 @@ const flickrBlockList = ['65237496@N03', '47445767@N05', '29633037@N05', '767714
   '35427622@N05', '76676024@N07', '143905885@N06', '71833159@N000','11024337@N03',
   '57608719@N08', '13497267@N04', '39404969@N08', '32481985@N00', '12947266@N08',
   '7470842@N04',  '98307374@N00', '42926702@N06', '68524128@N00', '24545757@N06',
-  '15051066@N03', '17068379@N00', '10102179@N00', '31322082@N08', '89795658@N07'];
+  '15051066@N03', '17068379@N00', '10102179@N00', '31322082@N08', '89795658@N07',
+  '65704544@N04'];
 
 const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const checkTags = (tags) => !flickrBlockedTags.some(blocked => tags.includes(blocked));
