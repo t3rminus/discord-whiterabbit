@@ -1,7 +1,7 @@
 version: '3.6'
 services:
-  pglmap:
-    image: t3rminus/whiterabbit:latest
+  whiterabbit:
+    build: .
     container_name: 'WhiteRabbit'
     restart: unless-stopped
     depends_on:
