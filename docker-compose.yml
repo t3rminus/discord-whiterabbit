@@ -1,0 +1,31 @@
+version: '3.6'
+services:
+  pglmap:
+    image: t3rminus/whiterabbit:latest
+    container_name: 'WhiteRabbit'
+    restart: unless-stopped
+    depends_on:
+    - db
+    environment:
+      NODE_ENV: 'production'
+      REDIS_URL: redis://redis:$REDIS_PASSWORD@db
+      DISCORD_TOKEN: $DISCORD_TOKEN
+      CAT_API_KEY: $CAT_API_KEY
+      DOG_API_KEY: $DOG_API_KEY
+      FLICKR_API_KEY: $FLICKR_API_KEY
+      GOOGLE_API_KEY: $GOOGLE_API_KEY
+  db:
+    image: bitnami/redis:latest
+    container_name: 'WhiteRabbitDB'
+    restart: unless-stopped
+    volumes:
+      - data:/bitnami/redis/data
+    environment:
+      REDIS_PASSWORD: $REDIS_PASSWORD
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 500M
+volumes:
+  data:

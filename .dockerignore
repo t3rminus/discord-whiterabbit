@@ -62,3 +62,8 @@ typings/
 .vscode
 
 spells.json
+Procfile
+README.md
+LICENSE
+.gitignore
+.git/
