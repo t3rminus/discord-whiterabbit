@@ -44,7 +44,7 @@ const flickrBlockedTags = ['stuffed','party','art','screenshot','screenshots',
   'genitals','humping','sex','scat','dung','poop','excrement','shit','feces',
   'faeces','manure','excreta','lab','laboratory','toy','plush','stuffed','figurines',
   'porcelain','ceramic','figures','paint','mask','prosthetic','streetart','amigurumi',
-  'crocheted','handmade','scarf'];
+  'crocheted','handmade','scarf','hide'];
 
 // These users abuse image tags, and are therefore excluded from results.
 const flickrBlockList = ['65237496@N03', '47445767@N05', '29633037@N05', '76771480@N04',

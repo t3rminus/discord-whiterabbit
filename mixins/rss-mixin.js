@@ -1,7 +1,8 @@
 const Misc = require('../lib/misc');
 const pr = require('request-promise-native');
 const Schedule = require('node-schedule');
-const FastFeed = require('fast-feed');
+const { XMLParser } = require('fast-xml-parser');
+const { decode } = require('html-entities');
 
 module.exports = (BotBase) =>
   class CatMixin extends BotBase {
@@ -159,11 +160,13 @@ module.exports = (BotBase) =>
           continue;
         }
 
-        let feed;
+        let rssChannel;
         try {
           const xml = await pr(feedInfo.url);
-          feed = FastFeed.parse(xml);
-          if (!feed.type) {
+          const parser = new XMLParser();
+          const feed = parser.parse(xml);
+          rssChannel = feed?.rss?.channel;
+          if (!rssChannel) {
             console.log(`Error parsing feed ${feedInfo.url}`, feed);
             continue;
           }
@@ -172,11 +175,13 @@ module.exports = (BotBase) =>
           continue;
         }
 
-        const newItems = feed.items.filter(item => item.date > feedInfo.lastChecked);
+        const newItems = rssChannel.item?.filter((item) => new Date(item.pubDate) > feedInfo.lastChecked);
         for (const newItem of newItems) {
           try {
-            if (feed.title) {
-              await channel.send(`New post from ${feed.title}!\n${newItem.link}`);
+            if (rssChannel.title) {
+              await channel.send(
+                `New post from ${decode(rssChannel.title)}!\n${newItem.link}`
+              );
             } else {
               // URL has already been validated upon adding
               const feedURL = new URL(feedInfo.url);
